@@ -4,6 +4,8 @@ import logging
 import math
 import signal
 import sys
+import os
+import json
 from pathlib import Path
 from types import FrameType
 from typing import Optional
@@ -320,6 +322,20 @@ def run_interaction_loop(
         if command_name != "human_feedback":
             cycles_remaining -= 1
         result = agent.execute(command_name, command_args, user_input)
+
+        processed_command_save_path = os.path.join(
+            "experimental_setups",
+            agent.exps[-1],
+            "responses",
+            f"processed_command_{agent.project_name}_{agent.bug_index}.json"
+        )
+
+        with open(processed_command_save_path, 'a+') as outf:
+            json.dump({
+                "command_name": command_name,
+                "arguments": command_args
+            }, outf, indent = 2)
+            outf.write("\n")
 
         if result is not None:
             logger.typewriter_log("SYSTEM: ", Fore.YELLOW, result)
