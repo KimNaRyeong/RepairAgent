@@ -16,7 +16,7 @@ def parse_json_block(file_path):
                     obj = json.loads(buffer)
                     blocks.append(obj)
                 except json.JSONDecodeError as e:
-                    # print("Failed to parse:", buffer)
+                    print("Failed to parse:", buffer)
                     print("Error:", e)
                     print(file_path)
                 buffer = ""
