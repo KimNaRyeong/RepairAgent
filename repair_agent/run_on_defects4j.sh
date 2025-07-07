@@ -17,6 +17,10 @@ log_file=timeout_bugs.txt
 dos2unix "$input"  # Convert file to Unix line endings (if needed)
 while IFS= read -r line || [ -n "$line" ]
 do
+    if [[ -z "$line" ]]; then
+        continue
+    fi
+    
     tuple=($line)
     echo ${tuple[0]}, ${tuple[1]}
     python3 prepare_ai_settings.py "${tuple[0]}" "${tuple[1]}"
