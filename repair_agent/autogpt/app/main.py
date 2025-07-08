@@ -177,6 +177,49 @@ def run_auto_gpt(
         experiment_file = experiment_file
     )
 
+    ## remove existing log files
+    processed_command_save_path = os.path.join(
+            "experimental_setups",
+            agent.exps[-1],
+            "responses",
+            f"processed_command_{agent.project_name}_{agent.bug_index}.json"
+        )
+    directory = f"./experimental_setups/{agent.exps[-1]}"
+    prompt_history_file = os.path.join(directory, 'logs', f"prompt_history_{agent.project_name}_{agent.bug_index}")
+    mutants_file = os.path.join(directory, 'mutations_history', f'mutants_{agent.project_name}_{agent.bug_index}.json')
+    mutants_raw_file = os.path.join(directory, 'mutations_history', f'mutants_raw_{agent.project_name}_{agent.bug_index}.json')
+    mutations_prompt_file = os.path.join(directory, 'mutations_history', f'mutations_prompt_{agent.project_name}_{agent.bug_index}')
+    plausible_patches_file = os.path.join(directory, 'plausible_patches', f'plausible_patches_{agent.project_name}_{agent.bug_index}.json')
+    model_responses_file = os.path.join(directory, 'responses', f'model_responses_{agent.project_name}_{agent.bug_index}')
+    processed_command_file = os.path.join(directory, 'responses', f'processed_command_{agent.project_name}_{agent.bug_index}.json')
+
+    if os.path.exists(prompt_history_file):
+        os.remove(prompt_history_file)
+        print(f"{prompt_history_file} is removed")
+    else:
+        print(f"{prompt_history_file} is not removed")
+    if os.path.exists(mutants_file):
+        os.remove(mutants_file)
+        print(f"{mutants_file} is removed")
+    if os.path.exists(mutants_raw_file):
+        os.remove(mutants_raw_file)
+        print(f"{mutants_raw_file} is removed")
+    if os.path.exists(mutations_prompt_file):
+        os.remove(mutations_prompt_file)
+        print(f"{mutations_prompt_file} is removed")
+    if os.path.exists(plausible_patches_file):
+        os.remove(plausible_patches_file)
+        print(f"{plausible_patches_file} is removed")
+    if os.path.exists(model_responses_file):
+        os.remove(model_responses_file)
+        print(f"{model_responses_file} is removed")
+    if os.path.exists(processed_command_file):
+        os.remove(processed_command_file)
+        print(f"{processed_command_file} is removed")
+    
+    
+
+
     run_interaction_loop(agent)
 
 
