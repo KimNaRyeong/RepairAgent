@@ -33,11 +33,11 @@ for i in $(seq 1 10); do
         RESPONSE_FILE_PATH="${HOME_DIR}/${DIR}/${RESPONSE_FILE_NAME}"
         PROCESSED_RESPONSE_FILE_PATH="${HOME_DIR}/${DIR}/${PROCESSED_RESPONSE_FILE_NAME}"
 
-        if [ -f "$LOG_FILE_PATH" ]; then
-            echo "Copying $LOG_FILE_PATH to $LOG_REMOTE_PATH"
-            cp "$LOG_FILE_PATH" "$LOG_REMOTE_PATH"
+        if [ -f "$RESPONSE_FILE_PATH" ]; then
+            echo "Copying $RESPONSE_FILE_PATH to $RESPONSE_REMOTE_PATH"
+            cp "$RESPONSE_FILE_PATH" "$RESPONSE_REMOTE_PATH"
         else
-            echo "File $LOG_FILE_PATH does not exist. Skipping."
+            echo "File $RESPONSE_FILE_PATH does not exist. Skipping."
         fi
     done
 done
