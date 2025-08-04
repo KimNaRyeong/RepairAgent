@@ -34,10 +34,10 @@ for i in $(seq 1 10); do
         PROCESSED_RESPONSE_FILE_PATH="${HOME_DIR}/${DIR}/${PROCESSED_RESPONSE_FILE_NAME}"
 
         if [ -f "$MUTANT_FILE_PATH" ]; then
-            echo "Copying $MUTATIONS_PROMPTS_FILE_PATH to $MUTATIONS_PROMPTS_REMOTE_PATH"
-            cp "$MUTATIONS_PROMPTS_FILE_PATH" "$MUTATIONS_PROMPTS_REMOTE_PATH"
+            echo "Copying $MUTANT_RAW_FILE_PATH to $MUTANT_RAW_REMOTE_PATH"
+            cp "$MUTANT_RAW_FILE_PATH" "$MUTANT_RAW_REMOTE_PATH"
         else
-            echo "File $MUTATIONS_PROMPTS_FILE_PATH does not exist. Skipping."
+            echo "File $MUTANT_RAW_FILE_PATH does not exist. Skipping."
         fi
     done
 done
