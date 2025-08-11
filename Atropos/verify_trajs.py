@@ -1,42 +1,70 @@
 
-import json, re
+import json, re, os
 
-def convert_content_to_list(input_text):
-    objects = []
-    brace_count = 0
-    current_object = ""
-    in_string = False
-    escape_next = False
+# def convert_content_to_list(input_text):
+#     objects = []
+#     brace_count = 0
+#     current_object = ""
+#     in_string = False
+#     escape_next = False
 
-    for char in input_text:
-        if escape_next:
-            escape_next = False
-            current_object += char
-            continue
+#     for char in input_text:
+#         if escape_next:
+#             escape_next = False
+#             current_object += char
+#             continue
         
-        if char == '\\':
-            escape_next = True
-            current_object += char
-            continue
+#         if char == '\\':
+#             escape_next = True
+#             current_object += char
+#             continue
 
-        if char == '"':
-            in_string = not in_string
+#         if char == '"':
+#             in_string = not in_string
 
         
-        if not in_string:
-            if char == '{':
-                brace_count += 1
-            elif char == '}':
-                brace_count -= 1
+#         if not in_string:
+#             if char == '{':
+#                 brace_count += 1
+#             elif char == '}':
+#                 brace_count -= 1
         
-        current_object += char
+#         current_object += char
 
-        if brace_count == 0 and current_object.strip():
-            parsed_obj = json.loads(current_object.strip())
-            objects.append(parsed_obj)
-            current_object = ""
+#         if brace_count == 0 and current_object.strip():
+#             parsed_obj = json.loads(current_object.strip())
+#             objects.append(parsed_obj)
+#             current_object = ""
     
-    return objects
+#     return objects
+
+def convert_response_to_string_list(input_text):
+    command_str_list = []
+    pattern = r"(\{\s*\n\"thoughts\".*?\n\})(?:\s*\{|$)"
+    
+    search_start = 0
+
+    while search_start < len(input_text):
+        remaining = input_text[search_start:]
+        # print(remaining)
+        # print('----------')
+        match = re.search(pattern, remaining, re.DOTALL)
+
+        if not match:
+            break
+        # print(match.start(), remaining[match.start():match.start()+10])
+        # print(match.end(), remaining[match.end():match.end()+10])
+
+        abs_start = search_start + match.start()
+        abs_end = search_start + match.end() -1
+
+        command_str_list.append(match.group(1))
+
+        search_start = abs_end
+    
+    return command_str_list
+
+    
 
 def extract_last_command_count(input_text):
     pattern = r'executed, (\d+) commands'
@@ -46,16 +74,102 @@ def extract_last_command_count(input_text):
     else:
         return None
 
-if __name__ == '__main__':
-    processed_response_file_path = '/home/kimnal0/RepairAgent/repair_agent/experimental_setups/experiment_1/responses/processed_command_Csv_1.json'
-    log_file_path = '/home/kimnal0/RepairAgent/repair_agent/experimental_setups/experiment_1/logs/prompt_history_Csv_1'
+def search_zero_commands(input_text):
+    pattern = "You have, so far, executed, 0 commands"
+    matches = re.findall(pattern, input_text, re.IGNORECASE)
+    return len(matches)
 
-    with open(processed_response_file_path, 'r') as f:
-        processed_response_content = f.read()
-    with open(log_file_path, 'r') as f:
-        log_content = f.read()
+def extract_last_execution_log(input_text):
+    sequences = input_text.split("============== ChatSequence ==============")
+
+    if sequences and not sequences[0].strip():
+        sequences = sequences[1:]
     
-    json_list = convert_content_to_list(processed_response_content)
-    print(len(json_list))
+    zero_command_indices = []
 
-    print(extract_last_command_count(log_content))
+    for i, sequence in enumerate(sequences):
+        if "You have, so far, executed, 0 commands" in sequence:
+            zero_command_indices.append(i)
+    
+    if not zero_command_indices:
+        return input_text
+
+    last_zero_index = zero_command_indices[-1]
+    last_execution_sequences = sequences[last_zero_index:]
+    result = "============== ChatSequence ==============".join(["\n"]+last_execution_sequences)
+
+    return result
+
+def process_log_files():
+    for i in range(1, 11):
+        log_file_dir = f'/home/kimnal0/RepairAgent/repair_agent/experimental_setups/experiment_{i}/logs'
+        log_files = os.listdir(log_file_dir)
+        for log_file in log_files:
+            splitted_log_file = log_file.split('_')
+            pid, vid = splitted_log_file[-2], splitted_log_file[-1]
+            if pid and vid:
+                with open(os.path.join(log_file_dir, log_file), 'r') as f:
+                    log_content = f.read()
+
+                if search_zero_commands(log_content) > 1:
+                    processed_log_content = extract_last_execution_log(log_content)
+                    with open(os.path.join(log_file_dir, f'processed_prompt_history_{pid}_{vid}'), 'w') as f:
+                        f.write(processed_log_content)
+
+def find_command_strings_from_log(input_text):
+    assistant_pattern = r"--------------- ASSISTANT ----------------\s*\n(\{.*?\n\})\s*\n(?=---|$)"
+    matches = re.findall(assistant_pattern, input_text, re.DOTALL)
+
+    command_strings = []
+
+    for match in matches:
+        match = match.strip()
+
+        command_strings.append(match)
+    return command_strings
+
+def process_response_files():
+    for i in range(1, 11):
+        log_file_dir = f'/home/kimnal0/RepairAgent/repair_agent/experimental_setups/experiment_{i}/logs'
+        log_files = os.listdir(log_file_dir)
+        for log_file in log_files:
+            splitted_log_file = log_file.split('_')
+            pid, vid = splitted_log_file[-2], splitted_log_file[-1]
+            if pid and vid:
+                with open(os.path.join(log_file_dir, log_file), 'r') as f:
+                    log_content = f.read()
+
+                if search_zero_commands(log_content) > 1:
+                    # print(i, pid, vid)
+                    last_execution_log = extract_last_execution_log(log_content)
+                    command_strings_from_log = find_command_strings_from_log(last_execution_log)
+
+                    response_file = f'/home/kimnal0/RepairAgent/repair_agent/experimental_setups/experiment_{i}/responses/model_responses_{pid}_{vid}'
+
+                    # if not os.path.exists(processed_response_file):
+                    #     continue
+                    with open(response_file, 'r') as f:
+                        response_content = f.read()
+
+                    command_str_list = convert_response_to_string_list(response_content)
+
+                    first_command_in_last_execution = command_strings_from_log[0]
+                    second_command_in_last_execution = command_strings_from_log[1]
+
+                    idx_of_first_command = -1
+                    for j, c in enumerate(command_str_list):
+                        if c == first_command_in_last_execution and command_str_list[j+1] == second_command_in_last_execution:
+                            idx_of_first_command = j
+
+                    if idx_of_first_command != -1:
+                        last_execution_response = command_str_list[idx_of_first_command:]
+                        with open(f'/home/kimnal0/RepairAgent/repair_agent/experimental_setups/experiment_{i}/responses/processed_model_responses_{pid}_{vid}', 'w') as f:
+                            f.write("".join(last_execution_response))
+
+
+if __name__ == '__main__':
+    pass
+    
+                    
+
+
