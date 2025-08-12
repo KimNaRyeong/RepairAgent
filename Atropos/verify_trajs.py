@@ -102,7 +102,7 @@ def extract_last_execution_log(input_text):
 
 def process_log_files():
     for i in range(1, 11):
-        log_file_dir = f'/home/kimnal0/RepairAgent/repair_agent/experimental_setups/experiment_{i}/logs'
+        log_file_dir = f'../repair_agent/experimental_setups/experiment_{i}/logs'
         log_files = os.listdir(log_file_dir)
         for log_file in log_files:
             splitted_log_file = log_file.split('_')
@@ -130,7 +130,7 @@ def find_command_strings_from_log(input_text):
 
 def process_response_files():
     for i in range(1, 11):
-        log_file_dir = f'/home/kimnal0/RepairAgent/repair_agent/experimental_setups/experiment_{i}/logs'
+        log_file_dir = f'../repair_agent/experimental_setups/experiment_{i}/logs'
         log_files = os.listdir(log_file_dir)
         for log_file in log_files:
             splitted_log_file = log_file.split('_')
@@ -144,7 +144,7 @@ def process_response_files():
                     last_execution_log = extract_last_execution_log(log_content)
                     command_strings_from_log = find_command_strings_from_log(last_execution_log)
 
-                    response_file = f'/home/kimnal0/RepairAgent/repair_agent/experimental_setups/experiment_{i}/responses/model_responses_{pid}_{vid}'
+                    response_file = f'../repair_agent/experimental_setups/experiment_{i}/responses/model_responses_{pid}_{vid}'
 
                     # if not os.path.exists(processed_response_file):
                     #     continue
@@ -163,12 +163,51 @@ def process_response_files():
 
                     if idx_of_first_command != -1:
                         last_execution_response = command_str_list[idx_of_first_command:]
-                        with open(f'/home/kimnal0/RepairAgent/repair_agent/experimental_setups/experiment_{i}/responses/processed_model_responses_{pid}_{vid}', 'w') as f:
+                        with open(f'../repair_agent/experimental_setups/experiment_{i}/responses/processed_model_responses_{pid}_{vid}', 'w') as f:
                             f.write("".join(last_execution_response))
 
+def generate_bug_list():
+    bug_list_file = './bugs_list.txt'
+
+    log_file_dir = f'../repair_agent/experimental_setups/experiment_10/responses'
+    log_files = os.listdir(log_file_dir)
+    bug_set = set()
+    
+    for log_file in sorted(log_files):
+        splitted_log_file = log_file.split('_')
+        pid, vid = splitted_log_file[-2], splitted_log_file[-1]
+        if vid.isdigit():
+            bug_set.add(f'{pid}_{vid}')
+
+    with open (bug_list_file, 'w') as f:
+        f.write("\n".join(sorted(list(bug_set))))
+
+def generate_response_json_files():
+    bug_list_file = './bugs_list.txt'
+    with open(bug_list_file, 'r') as f:
+        bug_list = f.read().splitlines()
+    
+    for i in range(1, 11):
+        response_file_dir = f'../repair_agent/experimental_setups/experiment_{i}/responses'
+        response_files = os.listdir(response_file_dir)
+        for bug_name in bug_list:
+            if f'processed_model_responses_{bug_name}' in response_files:
+                response_file = f'processed_model_responses_{bug_name}'
+            else:
+                response_file = f'model_responses_{bug_name}'
+
+            response_file_path = os.path.join(response_file_dir, response_file)
+            if os.path.exists(response_file_path):
+                with open(os.path.join(response_file_dir, response_file), 'r') as f:
+                    response_content = f.read()
+                response_str_list = convert_response_to_string_list(response_content)
+                response_json_file = f'model_responses_{bug_name}.json'
+                with open(os.path.join(response_file_dir, response_json_file), 'w') as f:
+                    json.dump(response_str_list, f, indent=2)
 
 if __name__ == '__main__':
-    pass
+    generate_response_json_files()
+
     
                     
 
