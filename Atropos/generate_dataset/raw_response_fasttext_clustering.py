@@ -348,7 +348,8 @@ if __name__ == '__main__':
     labels_dict = load_labels(args.label_criteria)
 
     # print(labels_dict)
-    k_values = [5, 10, 15, 20, 25, 30, 35, 40]
+    # k_values = [5, 10, 15, 20, 25, 30, 35, 40]
+    k_values = [5, 10, 15, 20, 25]
     threshold = args.threshold
     merge_threshold = args.merge_threshold
     response_type = 'raw_response' if args.raw_response else 'processed_response'

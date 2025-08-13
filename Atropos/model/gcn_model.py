@@ -27,7 +27,7 @@ def set_seed(seed):
 
 def print_metadata(dataset, ks, dataset_name):
     print(f"About {dataset_name}")
-    print(f"Data size: {len(dataset[100])}")
+    print(f"Data size: {len(dataset[5])}")
 
     for k in sorted(ks):
         print(f"------------{k}------------")
@@ -36,9 +36,9 @@ def print_metadata(dataset, ks, dataset_name):
 
 
 def get_baseline_acc(dataset, result_file):
-    num_total = len(dataset[100])
+    num_total = len(dataset[5])
     num_true = 0
-    for data in dataset[100]:
+    for data in dataset[5]:
         if data.y:
             num_true += 1
     baseline_acc = num_true / num_total
