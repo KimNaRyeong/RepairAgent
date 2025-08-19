@@ -1,5 +1,7 @@
 
 import json, re, os
+from collections import defaultdict
+from tqdm import tqdm
 
 # def convert_content_to_list(input_text):
 #     objects = []
@@ -186,7 +188,14 @@ def generate_bug_list():
 def generate_response_json_files():
     bug_list_file = './bugs_list.txt'
     with open(bug_list_file, 'r') as f:
-        bug_list = f.read().splitlines()
+        bugs_file_content = f.read().splitlines()
+    bug_list = []
+    for bug_line in bugs_file_content:
+        bug_name, start_idx, end_idx = bug_line.split()
+        start_idx, end_idx = int(start_idx), int(end_idx)
+        for i in range(start_idx, end_idx+1):
+            bug_list.append(f'{bug_name}_{i}')
+    print(bug_list)
     
     for i in range(1, 11):
         response_file_dir = f'../repair_agent/experimental_setups/experiment_{i}/responses'
@@ -196,6 +205,7 @@ def generate_response_json_files():
                 response_file = f'processed_model_responses_{bug_name}'
             else:
                 response_file = f'model_responses_{bug_name}'
+            response_file = f'model_responses_{bug_name}'
 
             response_file_path = os.path.join(response_file_dir, response_file)
             if os.path.exists(response_file_path):
@@ -206,9 +216,54 @@ def generate_response_json_files():
                 with open(os.path.join(response_file_dir, response_json_file), 'w') as f:
                     json.dump(response_str_list, f, indent=2)
 
+def get_reasoning_paths_for_all_bugs(raw_response=True):
+    bugs_list_file = './bugs_list.txt'
+
+    with open(bugs_list_file, 'r') as f:
+        bugs_file_content = f.read().splitlines()
+    bugs_list = []
+    for bug_line in bugs_file_content:
+        bug_name, start_idx, end_idx = bug_line.split()
+        start_idx, end_idx = int(start_idx), int(end_idx)
+        for i in range(start_idx, end_idx+1):
+            bugs_list.append(f'{bug_name}_{i}')
+    # bugs_list = ['Chart_1']
+    # bugs_list = ['Lang_48']
+    # print(bugs_list)
+
+
+    reasoning_paths_dict = defaultdict(list)
+
+    for bug_name in tqdm(bugs_list):
+        for i in range(1, 11):
+            if raw_response: # Should be modified!!! to have only command
+                traj_dir = f'../repair_agent/experimental_setups/experiment_{i}/responses'
+                traj_file = os.path.join(traj_dir, f'model_responses_{bug_name}.json')
+            else:
+                traj_dir = f'../repair_agent/experimental_setups/experiment_{i}/processed_response'
+                traj_file = os.path.join(traj_dir, f'processed_command_{bug_name}.json')
+            if os.path.exists(traj_file):
+                with open(traj_file, 'r') as f:
+                    trajectories = json.load(f)
+                    reasoning_paths_dict[bug_name].append(trajectories)
+
+            
+    return reasoning_paths_dict
+
 if __name__ == '__main__':
     # generate_response_json_files()
-    process_log_files()
+    # process_log_files()
+
+    command_num_dict = defaultdict(int)
+    reasoning_paths_dict = get_reasoning_paths_for_all_bugs(raw_response=False)
+    for bug_name, trajs in reasoning_paths_dict.items():
+        for traj in trajs:
+            for reasoning_step in traj:
+                command = reasoning_step["command_name"]
+                command_num_dict[command] += 1
+    
+    for i, (command, num) in enumerate(sorted(command_num_dict.items(), key=lambda x: x[1], reverse=True)):
+        print (i+1, command, num)
 
     
                     

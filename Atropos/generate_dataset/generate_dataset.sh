@@ -1,7 +1,10 @@
-python raw_response_fasttext_clustering.py -r -t 0.98 -m 0.99 -l 1
-python raw_response_fasttext_clustering.py -r -t 0.98 -m 0.99 -l 3
-python raw_response_fasttext_clustering.py -r -t 0.98 -m 0.99 -l 7
-python raw_response_fasttext_clustering.py -r -t 0.98 -m 0.99 -l 10
-python raw_response_fasttext_clustering.py -r -t 0.98 -m 0.99 -l 1 -e 300
-python raw_response_fasttext_clustering.py -r -t 0.95 -m 0.96
-python raw_response_fasttext_clustering.py -rw -t 0.98 -m 0.98
+python raw_response_fasttext_clustering.py -l 1 -t 0.96 -m 0.97
+python raw_response_fasttext_clustering.py -l 2 -t 0.96 -m 0.97
+python raw_response_fasttext_clustering.py -l 3 -t 0.96 -m 0.97
+python raw_response_fasttext_clustering.py -l 4 -t 0.96 -m 0.97
+python raw_response_fasttext_clustering.py -l 5 -t 0.96 -m 0.97
+python raw_response_fasttext_clustering.py -l 6 -t 0.96 -m 0.97
+python raw_response_fasttext_clustering.py -l 7 -t 0.96 -m 0.97
+python raw_response_fasttext_clustering.py -l 8 -t 0.96 -m 0.97
+python raw_response_fasttext_clustering.py -l 9 -t 0.96 -m 0.97
+python raw_response_fasttext_clustering.py -l 10 -t 0.96 -m 0.97

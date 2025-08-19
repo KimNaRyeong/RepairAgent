@@ -1,5 +1,5 @@
 import json, os
-
+from tqdm import tqdm
 def parse_json_block(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         blocks = []
@@ -23,18 +23,37 @@ def parse_json_block(file_path):
     
     return blocks
 
+def parse_json_block2(file_path):
+    blocks = []
+    with open(file_path, 'r') as f:
+        buffer = ""
+        for line in f:
+            buffer += line
+            try:
+                object = json.loads(buffer)
+                blocks.append(object)
+                buffer = ""
+            except:
+                continue
+    
+    if buffer:
+        print(file_path)
+
+    return blocks
+
+
 def parse_and_save_responses_files():
     for i in range(1, 11):
         file_path = f'../repair_agent/experimental_setups/experiment_{i}/responses'
         files = os.listdir(file_path)
-        print(files)
-        for file in files:
-            if file.startswith('processed'):
+        # print(files)
+        for file in tqdm(files):
+            if file.startswith('processed') and file.endswith('.json'):
                 splitted_file = file.split('_')
                 bug_name = splitted_file[-2]
                 bug_num = splitted_file[-1][:-5]
 
-                parsed_blocks = parse_json_block(os.path.join(file_path, file))
+                parsed_blocks = parse_json_block2(os.path.join(file_path, file))
                 save_path = f'../repair_agent/experimental_setups/experiment_{i}/processed_response/processed_command_{bug_name}_{bug_num}.json'
                 with open(save_path, 'w') as f:
                     json.dump(parsed_blocks, f, indent=4)
@@ -51,9 +70,9 @@ def main():
                 pass
 
 if __name__ == "__main__":
-    # chart_1 = "/workspaces/RepairAgent/repair_agent/experimental_setups/experiment_1/responses/processed_command_Chart_1.json"
-    # parsed_blocks = parse_json_block(chart_1)
-    # save_path = '../repair_agent/experimental_setups/experiment_1/parsed_chart1'
+    # chart_1 = "../repair_agent/experimental_setups/experiment_1/responses/processed_command_Chart_1.json"
+    # parsed_blocks = parse_json_block2(chart_1)
+    # save_path = '../repair_agent/experimental_setups/experiment_1/parsed_chart1.json'
     # with open(save_path, 'w') as f:
     #     json.dump(parsed_blocks, f, indent=4)
     parse_and_save_responses_files()

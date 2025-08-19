@@ -152,14 +152,14 @@ def main():
             #print(f"\nSuggested Fixes in Log File {idx}:\n{suggested_fixes_text}\n")
 
         # generate_pdf(experiment_folder, num_log_files, table, correctly_fixed_bugs, suggested_fixes, total_queries)
-        # generate_pdf(experiment_folder, num_log_files, table, correctly_fixed_bugs, suggested_fixes)
-        # write_to_text_file(experiment_folder, num_log_files, table, correctly_fixed_bugs, suggested_fixes, all_suggested_fixes)
+        generate_pdf(experiment_folder, num_log_files, table, correctly_fixed_bugs, suggested_fixes)
+        write_to_text_file(experiment_folder, num_log_files, table, correctly_fixed_bugs, suggested_fixes, all_suggested_fixes)
         # print(correctly_fixed_bugs)
-        print(table)
+        # print(table)
 
 
-    #print(f"Total Correctly Fixed Bugs Across Experiments: {total_correctly_fixed_bugs}")
-    #print(f"Grand Total Suggested Fixes Across Experiments: {total_suggested_fixes}")
+    print(f"Total Correctly Fixed Bugs Across Experiments: {total_correctly_fixed_bugs}")
+    print(f"Grand Total Suggested Fixes Across Experiments: {total_suggested_fixes}")
 
 if __name__ == "__main__":
     main()

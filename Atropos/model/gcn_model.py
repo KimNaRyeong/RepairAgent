@@ -425,7 +425,7 @@ def main(dataset_dir):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--dataset_dir', default='../data/clustering/fasttext/sentence_vector/100/raw_response/0.98_0.99/label_criteria_5') # should be modified
+    parser.add_argument('-d', '--dataset_dir', default='../data/clustering/fasttext/sentence_vector/100/raw_response/0.9_0.9/label_criteria_5') # should be modified
     args = parser.parse_args()
 
     main(args.dataset_dir)

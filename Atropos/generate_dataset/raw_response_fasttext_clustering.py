@@ -130,19 +130,29 @@ def get_reasoning_paths_for_all_bugs(raw_response=True):
     bugs_list_file = '../bugs_list.txt'
 
     with open(bugs_list_file, 'r') as f:
-        bugs_list = f.read().splitlines()
+        bugs_file_content = f.read().splitlines()
+    bugs_list = []
+    for bug_line in bugs_file_content:
+        bug_name, start_idx, end_idx = bug_line.split()
+        start_idx, end_idx = int(start_idx), int(end_idx)
+        for i in range(start_idx, end_idx+1):
+            bugs_list.append(f'{bug_name}_{i}')
     # bugs_list = ['Chart_1']
+    # bugs_list = ['Lang_48']
+    # bugs_list = ['Chart_1', 'Lang_48']
+    # print(bugs_list)
 
 
     reasoning_paths_dict = defaultdict(list)
 
     for bug_name in tqdm(bugs_list):
         for i in range(1, 11):
-            traj_dir = f'../../repair_agent/experimental_setups/experiment_{i}/responses'
-            if raw_response:
+            if raw_response: # Should be modified!!! to have only command
+                traj_dir = f'../../repair_agent/experimental_setups/experiment_{i}/responses'
                 traj_file = os.path.join(traj_dir, f'model_responses_{bug_name}.json')
             else:
-                traj_file = os.path.join(traj_dir, f'processed_model_responses_{bug_name}.json') # Should be modified
+                traj_dir = f'../../repair_agent/experimental_setups/experiment_{i}/processed_response'
+                traj_file = os.path.join(traj_dir, f'processed_command_{bug_name}.json')
             if os.path.exists(traj_file):
                 with open(traj_file, 'r') as f:
                     trajectories = json.load(f)
@@ -160,9 +170,9 @@ def embed_paths(model, reasoning_paths_dict, word_vector):
     for bug_name, trajectories in tqdm(reasoning_paths_dict.items()):
         for traj in trajectories:
             if word_vector:
-                embedding_traj = [model.get_word_vector(f) for f in traj]
+                embedding_traj = [model.get_word_vector(str(f)) for f in traj]
             else:
-                embedding_traj = [model.get_sentence_vector(f.replace('\n', ' ')) for f in traj]
+                embedding_traj = [model.get_sentence_vector(str(f).replace('\n', ' ')) for f in traj]
             embeddings_dict[bug_name].append(embedding_traj)
     
     return embeddings_dict
@@ -212,6 +222,7 @@ def create_trajectory_graphs_for_all_bugs(embeddings_dict, threshold=0.7, merge_
     clusterers_dict = {}
 
     print("Creating graphs of trajectories...")
+
     for bug_name, trajs in tqdm(embeddings_dict.items()):
         G, clusterer = create_trajectory_graph_for_bug(trajs, bug_name, threshold, merge_threshold)
         graphs_dict[bug_name] = G
@@ -254,7 +265,13 @@ def visualize_graph(G, file_name, save_dir=None):
 def load_labels(criteria_num):
     bugs_list_file = '../bugs_list.txt'
     with open(bugs_list_file, 'r') as f:
-        bugs_list = f.read().splitlines()
+        bugs_file_content = f.read().splitlines()
+    bugs_list = []
+    for bug_line in bugs_file_content:
+        bug_name, start_idx, end_idx = bug_line.split()
+        start_idx, end_idx = int(start_idx), int(end_idx)
+        for i in range(start_idx, end_idx+1):
+            bugs_list.append(f'{bug_name}_{i}')
 
     resolved_num_dict = defaultdict(int)
     labels_dict = {}
@@ -330,7 +347,7 @@ def calculate_avg_node_num(graphs_dict):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-l', '--label_criteria', default = 5, type=int)
+    parser.add_argument('-l', '--label_criteria', default = [5], nargs='+', type=int)
     parser.add_argument('-r', '--raw_response', action="store_true")
     parser.add_argument('-w', '--word_vector', action="store_true")
     parser.add_argument('-e', '--embedding_length', default=100, type=int)
@@ -338,38 +355,38 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--merge_threshold', default=0.9, type=float)
     args = parser.parse_args()
 
+    print(args.label_criteria)
     reasoning_paths_dict = get_reasoning_paths_for_all_bugs(args.raw_response)
 
 
     model = load_fasttext_model(args.embedding_length)
     embedding_paths_dict = embed_paths(model, reasoning_paths_dict, args.word_vector)
 
-    # bugs_list = list(reasoning_paths_dict.keys())
-    labels_dict = load_labels(args.label_criteria)
-
-    # print(labels_dict)
-    # k_values = [5, 10, 15, 20, 25, 30, 35, 40]
-    k_values = [5, 10, 15, 20, 25]
+    k_values = [5, 10, 15, 20, 25, 30, 35, 40]
+    # k_values = [5, 10, 15, 20, 25]
     threshold = args.threshold
     merge_threshold = args.merge_threshold
     response_type = 'raw_response' if args.raw_response else 'processed_response'
     embedding_type = 'word_vector' if args.word_vector else 'sentence_vector'
 
     datasets_dict = {}
+
     for k in k_values:
         limited_embeddings_dict = limit_embeddings_by_k(embedding_paths_dict, k)
 
         graphs_dict, clusterers_dict = create_trajectory_graphs_for_all_bugs(limited_embeddings_dict, threshold, merge_threshold)
+        for label in args.label_criteria:
+            labels_dict = load_labels(label)
 
-        gcn_dataset = create_gcn_dataset_for_all_bugs(graphs_dict, clusterers_dict, labels_dict)
+            gcn_dataset = create_gcn_dataset_for_all_bugs(graphs_dict, clusterers_dict, labels_dict)
 
-        dataset_dir = f'../data/clustering/fasttext/{embedding_type}/{args.embedding_length}/{response_type}/{threshold}_{merge_threshold}/label_criteria_{str(args.label_criteria)}/{k}'
-        if not os.path.exists(dataset_dir):
-            os.makedirs(dataset_dir)
-        
-        torch.save(gcn_dataset, os.path.join(dataset_dir, 'gcn_dataset.pt'))
+            dataset_dir = f'../data/clustering/fasttext/{embedding_type}/{args.embedding_length}/{response_type}/{threshold}_{merge_threshold}/label_criteria_{label}/{k}'
+            if not os.path.exists(dataset_dir):
+                os.makedirs(dataset_dir)
+            
+            torch.save(gcn_dataset, os.path.join(dataset_dir, 'gcn_dataset.pt'))
 
-        print(f'Dataset for {k} is successfully genertaed!')
+            print(f'Dataset for {k} with label criteria {label} is successfully genertaed!')
         
 
 
@@ -381,6 +398,7 @@ if __name__ == '__main__':
     #     os.makedirs(trajs_dir)
 
     # visualize_graph(graphs_dict['Chart_1'], f'Chart_1_{threshold}_{merge_threshold}', trajs_dir)
+    # visualize_graph(graphs_dict['Lang_48'], f'Lang_48_{threshold}_{merge_threshold}', trajs_dir)
 
     # gcn_dataset = create_gcn_dataset_for_all_bugs(graphs_dict, clusterers_dict, labels_dict)
 
