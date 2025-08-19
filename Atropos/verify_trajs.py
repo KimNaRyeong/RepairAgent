@@ -112,9 +112,10 @@ def process_log_files():
                     log_content = f.read()
 
                 if search_zero_commands(log_content) > 1:
-                    processed_log_content = extract_last_execution_log(log_content)
-                    with open(os.path.join(log_file_dir, f'processed_prompt_history_{pid}_{vid}'), 'w') as f:
-                        f.write(processed_log_content)
+                    # processed_log_content = extract_last_execution_log(log_content)
+                    # with open(os.path.join(log_file_dir, f'processed_prompt_history_{pid}_{vid}'), 'w') as f:
+                    #     f.write(processed_log_content)
+                    print(f'experiment_{i}, {pid} {vid}')
 
 def find_command_strings_from_log(input_text):
     assistant_pattern = r"--------------- ASSISTANT ----------------\s*\n(\{.*?\n\})\s*\n(?=---|$)"
@@ -206,7 +207,8 @@ def generate_response_json_files():
                     json.dump(response_str_list, f, indent=2)
 
 if __name__ == '__main__':
-    generate_response_json_files()
+    # generate_response_json_files()
+    process_log_files()
 
     
                     
