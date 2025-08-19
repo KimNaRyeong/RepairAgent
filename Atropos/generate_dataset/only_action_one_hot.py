@@ -462,7 +462,7 @@ if __name__ == '__main__':
 
     reasoning_paths_dict = get_reasoning_paths_for_all_bugs(args.raw_response)
 
-    one_hot_vectors_dict = embedding_command_to_one_hot_vector_for_all_bugs(reasoning_paths_dict)
+    one_hot_vectors_dict = embedding_command_to_one_hot_vector_for_all_bugs(reasoning_paths_dict, args.action_num)
 
     labels_dict = load_labels(args.label_criteria)
 
@@ -483,9 +483,9 @@ if __name__ == '__main__':
 
         print(f'Dataset for {k} is successfully genertaed!')
 
-        # Visualization
-        visualize_graph(graphs_dict['Chart_1'], f'Chart_1_{k}', f'../trajs_graphs/only_action/{args.action_num+1}/{response_type}')
-        visualize_graph(graphs_dict['Lang_48'], f'Lang_48_{k}', f'../trajs_graphs/only_action/{args.action_num+1}/{response_type}')
+        # # Visualization
+        # visualize_graph(graphs_dict['Chart_1'], f'Chart_1_{k}', f'../trajs_graphs/only_action/{args.action_num+1}/{response_type}')
+        # visualize_graph(graphs_dict['Lang_48'], f'Lang_48_{k}', f'../trajs_graphs/only_action/{args.action_num+1}/{response_type}')
         
 
 
