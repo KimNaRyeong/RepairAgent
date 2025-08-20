@@ -13,6 +13,7 @@ python only_action_one_hot.py -l 1 -a 39
 python only_action_one_hot.py -l 2 -a 39
 python only_action_one_hot.py -l 3 -a 39
 python only_action_one_hot.py -l 4 -a 39
+python only_action_one_hot.py -l 5 -a 39
 python only_action_one_hot.py -l 6 -a 39
 python only_action_one_hot.py -l 7 -a 39
 python only_action_one_hot.py -l 8 -a 39

@@ -139,6 +139,7 @@ def get_reasoning_paths_for_all_bugs(raw_response=True):
             bugs_list.append(f'{bug_name}_{i}')
     # bugs_list = ['Chart_1']
     # bugs_list = ['Lang_48']
+    # bugs_list = ['Chart_1', 'Lang_48']
     # print(bugs_list)
 
 
