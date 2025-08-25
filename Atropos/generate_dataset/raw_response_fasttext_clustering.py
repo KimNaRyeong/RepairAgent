@@ -262,7 +262,7 @@ def visualize_graph(G, file_name, save_dir=None):
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
 
-def load_labels(criteria_num):
+def load_labels(criteria_num, use_plausible_patch):
     bugs_list_file = '../bugs_list.txt'
     with open(bugs_list_file, 'r') as f:
         bugs_file_content = f.read().splitlines()
@@ -277,13 +277,33 @@ def load_labels(criteria_num):
     labels_dict = {}
 
     for i in range(1, 11):
+        bug_correctly_fixed_dict = {}
         result_file = f'../../repair_agent/experimental_setups/experiment_{i}_results.csv'
+        if use_plausible_patch:
+            plausible_patch_dir = f'../../repair_agent/experimental_setups/experiment_{i}/plausible_patches'
 
         with open(result_file, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                if row['Correctly Fixed'] == "Yes":
-                    resolved_num_dict[row['Log File']] += 1
+                bug_correctly_fixed_dict[row['Log File']] = row['Correctly Fixed']
+        
+        for bug_name in bugs_list:
+                if use_plausible_patch:
+                    pid, vid = bug_name.split('_')
+                    plausible_patches_file = os.path.join(plausible_patch_dir, f'plausible_patches_{pid}_{vid}.json')
+
+                    if bug_name in bug_correctly_fixed_dict.keys():
+                        if bug_correctly_fixed_dict[bug_name] == 'Yes':
+                            resolved_num_dict[bug_name] += 1
+                        elif os.path.exists(plausible_patches_file):
+                            resolved_num_dict[bug_name] += 1
+                    elif os.path.exists(plausible_patches_file):
+                        resolved_num_dict[bug_name] += 1
+                        
+                else:
+                    if bug_name in bug_correctly_fixed_dict.keys():
+                        if bug_correctly_fixed_dict[bug_name] == 'Yes':
+                            resolved_num_dict[bug_name] += 1
     
     for bug_name in bugs_list:
         if resolved_num_dict[bug_name] >= criteria_num:
@@ -353,6 +373,7 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--embedding_length', default=100, type=int)
     parser.add_argument('-t', '--threshold', default=0.9, type=float)
     parser.add_argument('-m', '--merge_threshold', default=0.9, type=float)
+    parser.add_argument('-p', '--plausible_patch', action="store_true")
     args = parser.parse_args()
 
     print(args.label_criteria)
@@ -376,7 +397,7 @@ if __name__ == '__main__':
 
         graphs_dict, clusterers_dict = create_trajectory_graphs_for_all_bugs(limited_embeddings_dict, threshold, merge_threshold)
         for label in args.label_criteria:
-            labels_dict = load_labels(label)
+            labels_dict = load_labels(label, args.plausible_patch)
 
             gcn_dataset = create_gcn_dataset_for_all_bugs(graphs_dict, clusterers_dict, labels_dict)
 

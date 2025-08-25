@@ -262,7 +262,7 @@ def create_trajectory_graphs_for_all_bugs(embeddings_dict, threshold=0.7, merge_
 #     if save_path:
 #         plt.savefig(save_path, dpi=300, bbox_inches='tight')
 
-def load_labels(criteria_num):
+def load_labels(criteria_num, use_plausible_patch):
     bugs_list_file = '../bugs_list.txt'
     with open(bugs_list_file, 'r') as f:
         bugs_file_content = f.read().splitlines()
@@ -277,13 +277,33 @@ def load_labels(criteria_num):
     labels_dict = {}
 
     for i in range(1, 11):
+        bug_correctly_fixed_dict = {}
         result_file = f'../../repair_agent/experimental_setups/experiment_{i}_results.csv'
+        if use_plausible_patch:
+            plausible_patch_dir = f'../../repair_agent/experimental_setups/experiment_{i}/plausible_patches'
 
         with open(result_file, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                if row['Correctly Fixed'] == "Yes":
-                    resolved_num_dict[row['Log File']] += 1
+                bug_correctly_fixed_dict[row['Log File']] = row['Correctly Fixed']
+        
+        for bug_name in bugs_list:
+                if use_plausible_patch:
+                    pid, vid = bug_name.split('_')
+                    plausible_patches_file = os.path.join(plausible_patch_dir, f'plausible_patches_{pid}_{vid}.json')
+
+                    if bug_name in bug_correctly_fixed_dict.keys():
+                        if bug_correctly_fixed_dict[bug_name] == 'Yes':
+                            resolved_num_dict[bug_name] += 1
+                        elif os.path.exists(plausible_patches_file):
+                            resolved_num_dict[bug_name] += 1
+                    elif os.path.exists(plausible_patches_file):
+                        resolved_num_dict[bug_name] += 1
+                        
+                else:
+                    if bug_name in bug_correctly_fixed_dict.keys():
+                        if bug_correctly_fixed_dict[bug_name] == 'Yes':
+                            resolved_num_dict[bug_name] += 1
     
     for bug_name in bugs_list:
         if resolved_num_dict[bug_name] >= criteria_num:
@@ -292,10 +312,6 @@ def load_labels(criteria_num):
             labels_dict[bug_name] = 0
 
     return labels_dict
-    
-
-
-
 
 def limit_embeddings_by_k(embeddings_dict, k):
     limited_embeddings_dict = defaultdict(list)
@@ -457,6 +473,7 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--label_criteria', default = 5, type=int)
     parser.add_argument('-r', '--raw_response', action="store_true")
     parser.add_argument('-a', '--action_num', default=19, type=int)
+    parser.add_argument('-p', '--plausible_patch', action="store_true")
     args = parser.parse_args()
 
     response_type = 'raw_response' if args.raw_response else 'processed_response'
@@ -465,7 +482,7 @@ if __name__ == '__main__':
 
     one_hot_vectors_dict = embedding_command_to_one_hot_vector_for_all_bugs(reasoning_paths_dict, args.action_num)
 
-    labels_dict = load_labels(args.label_criteria)
+    labels_dict = load_labels(args.label_criteria, args.plausible_patch)
 
     k_values = [5, 10, 15, 20, 25, 30, 35, 40]
 
@@ -475,8 +492,10 @@ if __name__ == '__main__':
         graphs_dict = create_graphs_for_all_bugs(limited_one_hot_vectors_dict)
         gcn_dataset = create_gcn_dataset_for_all_bugs(graphs_dict, labels_dict)
 
-
-        dataset_dir = f'../data/only_action/{args.action_num+1}/{response_type}/label_criteria_{str(args.label_criteria)}/{k}'
+        if args.plausible_patch:
+            dataset_dir = f'../data/only_action/{args.action_num+1}/{response_type}/plausible_patch/label_criteria_{str(args.label_criteria)}/{k}'
+        else:
+            dataset_dir = f'../data/only_action/{args.action_num+1}/{response_type}/label_criteria_{str(args.label_criteria)}/{k}'
         if not os.path.exists(dataset_dir):
             os.makedirs(dataset_dir)
         
