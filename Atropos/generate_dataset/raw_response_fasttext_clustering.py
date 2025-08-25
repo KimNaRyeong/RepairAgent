@@ -126,6 +126,35 @@ def load_fasttext_model(embedding_length):
     fasttext.util.reduce_model(model, embedding_size)
     return model
 
+def parse_json_block(file_path):
+    blocks = []
+    with open(file_path, 'r') as f:
+        buffer = ""
+        for line in f:
+            buffer += line
+            try:
+                object = json.loads(buffer)
+                blocks.append(object)
+                buffer = ""
+            except:
+                continue
+    
+    if buffer:
+        print(file_path)
+
+    return blocks
+
+def process_response_file(bug_name, exp_idx):
+    experiment_dir = f'../../repair_agent/experimental_setups/experiment_{exp_idx}'
+    raw_processed_response_file = os.path.join(experiment_dir, f'responses/processed_command_{bug_name}.json')
+    
+    if os.path.exists(raw_processed_response_file):
+        parsed_blocks = parse_json_block(raw_processed_response_file)
+        save_path = os.path.join(experiment_dir, f'processed_response/processed_command_{bug_name}.json')
+        with open(save_path, 'w') as f:
+            json.dump(parsed_blocks, f, indent=4)
+        print(f'{save_path} is saved.')
+
 def get_reasoning_paths_for_all_bugs(raw_response=True):
     bugs_list_file = '../bugs_list.txt'
 
@@ -153,6 +182,9 @@ def get_reasoning_paths_for_all_bugs(raw_response=True):
             else:
                 traj_dir = f'../../repair_agent/experimental_setups/experiment_{i}/processed_response'
                 traj_file = os.path.join(traj_dir, f'processed_command_{bug_name}.json')
+            
+            if not os.path.exists(traj_file):
+                process_response_file(bug_name, i)
             if os.path.exists(traj_file):
                 with open(traj_file, 'r') as f:
                     trajectories = json.load(f)
@@ -401,7 +433,10 @@ if __name__ == '__main__':
 
             gcn_dataset = create_gcn_dataset_for_all_bugs(graphs_dict, clusterers_dict, labels_dict)
 
-            dataset_dir = f'../data/clustering/fasttext/{embedding_type}/{args.embedding_length}/{response_type}/{threshold}_{merge_threshold}/label_criteria_{label}/{k}'
+            if args.plausible_patch:
+                dataset_dir = f'../data/clustering/fasttext/{embedding_type}/{args.embedding_length}/{response_type}/{threshold}_{merge_threshold}/plausible_patch/label_criteria_{label}/{k}'
+            else:
+                dataset_dir = f'../data/clustering/fasttext/{embedding_type}/{args.embedding_length}/{response_type}/{threshold}_{merge_threshold}/label_criteria_{label}/{k}'
             if not os.path.exists(dataset_dir):
                 os.makedirs(dataset_dir)
             

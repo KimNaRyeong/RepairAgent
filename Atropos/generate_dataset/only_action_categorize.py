@@ -11,120 +11,34 @@ from tqdm import tqdm
 from sklearn.metrics.pairwise import cosine_similarity
 from torch_geometric.utils import from_networkx
 
-class Clusterer:
-    def __init__(self, threshold=0.7, merge_threshold=0.8):
-        self.threshold = threshold
-        self.merge_threshold = merge_threshold
-        self.clusters = []
-        self.cluster_centers = []
-        self.step_to_cluster = {}
+def parse_json_block(file_path):
+    blocks = []
+    with open(file_path, 'r') as f:
+        buffer = ""
+        for line in f:
+            buffer += line
+            try:
+                object = json.loads(buffer)
+                blocks.append(object)
+                buffer = ""
+            except:
+                continue
     
-    def _calculate_center(self, vectors):
-        if not vectors:
-            return None
-        return np.mean(vectors, axis=0)
-    
-    def _cosine_sim(self, vec1, vec2):
-        return cosine_similarity([vec1], [vec2])[0][0]
-    
-    def add_step(self, step_vector, step_id):
-        if not self.clusters:
-            self.clusters.append([step_vector])
-            self.cluster_centers.append(step_vector.copy())
-            self.step_to_cluster[step_id] = 0
-            return 0
-        
-        similarities = []
-        for center in self.cluster_centers:
-            sim = self._cosine_sim(step_vector, center)
-            similarities.append(sim)
-        
-        above_threshold = [(i, sim) for i, sim in enumerate(similarities) if sim > self.threshold]
+    if buffer:
+        print(file_path)
 
-        if len(above_threshold) == 0:
-            cluster_idx = len(self.clusters)
-            self.clusters.append([step_vector])
-            self.cluster_centers.append(step_vector.copy())
-            self.step_to_cluster[step_id] = cluster_idx
-            return cluster_idx
-        elif len(above_threshold) == 1:
-            cluster_idx = above_threshold[0][0]
-            self.clusters[cluster_idx].append(step_vector)
-            self.cluster_centers[cluster_idx] = self._calculate_center(self.clusters[cluster_idx])
-            self.step_to_cluster[step_id] = cluster_idx
-            return cluster_idx
-        else:
-            best_cluster_idx = max(above_threshold, key=lambda x: x[1])[0]
-            self.clusters[best_cluster_idx].append(step_vector)
-            self.cluster_centers[best_cluster_idx] = self._calculate_center(self.clusters[best_cluster_idx])
-            self.step_to_cluster[step_id] = best_cluster_idx
-            return best_cluster_idx
+    return blocks
+
+def process_response_file(bug_name, exp_idx):
+    experiment_dir = f'../../repair_agent/experimental_setups/experiment_{exp_idx}'
+    raw_processed_response_file = os.path.join(experiment_dir, f'responses/processed_command_{bug_name}.json')
     
-    def merge_similar_clusters(self):
-        """Merge clusters whose centers have similarity > threshold2"""
-        if len(self.cluster_centers) <= 1:
-            return
-        
-        merged = True
-        while merged:
-            merged = False
-            to_remove = []
-            for i in range(len(self.cluster_centers)):
-                if i in to_remove:
-                    continue
-                for j in range(i + 1, len(self.cluster_centers)):
-                    if j in to_remove:
-                        continue
-                    
-                    sim = self._cosine_sim(self.cluster_centers[i], self.cluster_centers[j])
-                    if sim > self.merge_threshold:
-                        self.clusters[i].extend(self.clusters[j])
-                        self.cluster_centers[i] = self._calculate_center(self.clusters[i])
-                        
-                        for step_id, cluster_idx in self.step_to_cluster.items():
-                            if cluster_idx == j:
-                                self.step_to_cluster[step_id] = i
-                            elif cluster_idx > j:
-                                self.step_to_cluster[step_id] = cluster_idx - 1
-                        
-                        to_remove.append(j)
-                        merged = True
-                        break
-                
-                if merged:
-                    break
-            
-            for idx in sorted(to_remove, reverse=True):
-                del self.clusters[idx]
-                del self.cluster_centers[idx]
-    
-    def get_cluster_for_step(self, step_id):
-        return self.step_to_cluster.get(step_id, -1)
-    
-    def get_most_central_vector_for_cluster(self, cluster_idx):
-        cluster_vectors = self.clusters[cluster_idx]
-        cluster_center = self.cluster_centers[cluster_idx]
-
-        best_vector = None
-        best_similarity = -1
-
-        for vector in cluster_vectors:
-            sim = self._cosine_sim(vector, cluster_center)
-            if sim > best_similarity:
-                best_similarity = sim
-                best_vector = vector
-        
-        return best_vector
-
-    
-
-
-def load_fasttext_model(embedding_length):
-    embedding_size = embedding_length
-    fasttext.util.download_model('en', if_exists='ignore')
-    model = fasttext.load_model('cc.en.300.bin')
-    fasttext.util.reduce_model(model, embedding_size)
-    return model
+    if os.path.exists(raw_processed_response_file):
+        parsed_blocks = parse_json_block(raw_processed_response_file)
+        save_path = os.path.join(experiment_dir, f'processed_response/processed_command_{bug_name}.json')
+        with open(save_path, 'w') as f:
+            json.dump(parsed_blocks, f, indent=4)
+        print(f'{save_path} is saved.')
 
 def get_reasoning_paths_for_all_bugs(raw_response=True):
     bugs_list_file = '../bugs_list.txt'
@@ -153,6 +67,8 @@ def get_reasoning_paths_for_all_bugs(raw_response=True):
             else:
                 traj_dir = f'../../repair_agent/experimental_setups/experiment_{i}/processed_response'
                 traj_file = os.path.join(traj_dir, f'processed_command_{bug_name}.json')
+            if not os.path.exists(traj_file):
+                process_response_file(bug_name, i)
             if os.path.exists(traj_file):
                 with open(traj_file, 'r') as f:
                     trajectories = json.load(f)
@@ -160,6 +76,7 @@ def get_reasoning_paths_for_all_bugs(raw_response=True):
 
             
     return reasoning_paths_dict
+
 
 
     
@@ -176,59 +93,6 @@ def embed_paths(model, reasoning_paths_dict, word_vector):
             embeddings_dict[bug_name].append(embedding_traj)
     
     return embeddings_dict
-
-def create_trajectory_graph_for_bug(trajs, bug_name, threshold=0.1, merge_threshold=0.1):
-    clusterer = Clusterer(threshold, merge_threshold)
-    step_counter = 0
-
-
-    for i, traj in enumerate(trajs):
-        for j, reasoning_step in enumerate(traj):
-            step_id = f"{bug_name}_{i}_{j}"
-            clusterer.add_step(reasoning_step, step_id)
-            step_counter += 1
-    
-    # print("done..")
-    
-    clusterer.merge_similar_clusters()
-
-
-    G = nx.DiGraph()
-
-    for i in range(len(clusterer.clusters)):
-        G.add_node(i, size=len(clusterer.clusters[i]))
-    
-    for i, traj in enumerate(trajs):
-        prev_cluster = None
-        for j, reasoning_step in enumerate(traj):
-            step_id = f"{bug_name}_{i}_{j}"
-            current_cluster = clusterer.get_cluster_for_step(step_id)
-
-            if prev_cluster is not None:
-                if G.has_edge(prev_cluster, current_cluster):
-                    G[prev_cluster][current_cluster]['weight'] += 1
-                else:
-                    G.add_edge(prev_cluster, current_cluster, weight=1)
-            
-            prev_cluster = current_cluster
-    
-    return G, clusterer
-
-
-
-
-def create_trajectory_graphs_for_all_bugs(embeddings_dict, threshold=0.7, merge_threshold=0.8):
-    graphs_dict = {}
-    clusterers_dict = {}
-
-    print("Creating graphs of trajectories...")
-
-    for bug_name, trajs in tqdm(embeddings_dict.items()):
-        G, clusterer = create_trajectory_graph_for_bug(trajs, bug_name, threshold, merge_threshold)
-        graphs_dict[bug_name] = G
-        clusterers_dict[bug_name] = clusterer
-    
-    return graphs_dict, clusterers_dict
 
 # def visualize_graph(G, file_name, save_dir=None):
 #     """Visualize the trajectory graph for a specific bug"""
@@ -262,7 +126,7 @@ def create_trajectory_graphs_for_all_bugs(embeddings_dict, threshold=0.7, merge_
 #     if save_path:
 #         plt.savefig(save_path, dpi=300, bbox_inches='tight')
 
-def load_labels(criteria_num):
+def load_labels(criteria_num, use_plausible_patch):
     bugs_list_file = '../bugs_list.txt'
     with open(bugs_list_file, 'r') as f:
         bugs_file_content = f.read().splitlines()
@@ -277,13 +141,33 @@ def load_labels(criteria_num):
     labels_dict = {}
 
     for i in range(1, 11):
+        bug_correctly_fixed_dict = {}
         result_file = f'../../repair_agent/experimental_setups/experiment_{i}_results.csv'
+        if use_plausible_patch:
+            plausible_patch_dir = f'../../repair_agent/experimental_setups/experiment_{i}/plausible_patches'
 
         with open(result_file, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                if row['Correctly Fixed'] == "Yes":
-                    resolved_num_dict[row['Log File']] += 1
+                bug_correctly_fixed_dict[row['Log File']] = row['Correctly Fixed']
+        
+        for bug_name in bugs_list:
+                if use_plausible_patch:
+                    pid, vid = bug_name.split('_')
+                    plausible_patches_file = os.path.join(plausible_patch_dir, f'plausible_patches_{pid}_{vid}.json')
+
+                    if bug_name in bug_correctly_fixed_dict.keys():
+                        if bug_correctly_fixed_dict[bug_name] == 'Yes':
+                            resolved_num_dict[bug_name] += 1
+                        elif os.path.exists(plausible_patches_file):
+                            resolved_num_dict[bug_name] += 1
+                    elif os.path.exists(plausible_patches_file):
+                        resolved_num_dict[bug_name] += 1
+                        
+                else:
+                    if bug_name in bug_correctly_fixed_dict.keys():
+                        if bug_correctly_fixed_dict[bug_name] == 'Yes':
+                            resolved_num_dict[bug_name] += 1
     
     for bug_name in bugs_list:
         if resolved_num_dict[bug_name] >= criteria_num:
@@ -292,6 +176,7 @@ def load_labels(criteria_num):
             labels_dict[bug_name] = 0
 
     return labels_dict
+
     
 
 
@@ -481,6 +366,7 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--label_criteria', default = 5, type=int)
     parser.add_argument('-r', '--raw_response', action="store_true")
     parser.add_argument('-a', '--action_num', default=19, type=int)
+    parser.add_argument('-p', '--plausible_patch', action="store_true")
     args = parser.parse_args()
 
     response_type = 'raw_response' if args.raw_response else 'processed_response'
@@ -488,7 +374,7 @@ if __name__ == '__main__':
     reasoning_paths_dict = get_reasoning_paths_for_all_bugs(args.raw_response)
 
     one_hot_vectors_dict = embedding_command_to_one_hot_vector_for_all_bugs(reasoning_paths_dict)
-    labels_dict = load_labels(args.label_criteria)
+    labels_dict = load_labels(args.label_criteria, args.plausible_patch)
 
     k_values = [5, 10, 15, 20, 25, 30, 35, 40]
 
@@ -498,18 +384,16 @@ if __name__ == '__main__':
         graphs_dict = create_graphs_for_all_bugs(limited_one_hot_vectors_dict)
         gcn_dataset = create_gcn_dataset_for_all_bugs(graphs_dict, labels_dict)
 
-
-        dataset_dir = f'../data/only_action/categorize/{response_type}/label_criteria_{str(args.label_criteria)}/{k}'
+        if args.plausible_patch:
+            dataset_dir = f'../data/only_action/categorize/{response_type}/plausible_patch/label_criteria_{str(args.label_criteria)}/{k}'    
+        else:
+            dataset_dir = f'../data/only_action/categorize/{response_type}/label_criteria_{str(args.label_criteria)}/{k}'
         if not os.path.exists(dataset_dir):
             os.makedirs(dataset_dir)
         
         torch.save(gcn_dataset, os.path.join(dataset_dir, 'gcn_dataset.pt'))
 
         print(f'Dataset for {k} is successfully genertaed!')
-
-        # # Visualization
-        # visualize_graph(graphs_dict['Chart_1'], f'Chart_1_{k}', f'../trajs_graphs/only_action/{args.action_num+1}/{response_type}')
-        # visualize_graph(graphs_dict['Lang_48'], f'Lang_48_{k}', f'../trajs_graphs/only_action/{args.action_num+1}/{response_type}')
         
 
 
