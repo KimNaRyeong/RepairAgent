@@ -365,7 +365,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-l', '--label_criteria', default = 5, type=int)
     parser.add_argument('-r', '--raw_response', action="store_true")
-    parser.add_argument('-a', '--action_num', default=19, type=int)
     parser.add_argument('-p', '--plausible_patch', action="store_true")
     args = parser.parse_args()
 
