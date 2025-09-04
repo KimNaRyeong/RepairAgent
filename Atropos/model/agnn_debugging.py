@@ -40,7 +40,7 @@ class SearchSpace:
         self.combine_functions = ['identity', 'mlp']
         self.activation_functions = ['ReLU', 'LeakyReLU']
         self.dropout_p = [0.3, 0.5, 0.8]
-        self.learning_rate = [0.001, 0.005]
+        self.learning_rate = [0.001, 0.005, 0.01]
         self.batch_size = [32, 64]
 
         self.action_classes = [
@@ -257,27 +257,46 @@ class Evaluator:
         dataset_list: list of torch_geometric.data.Data graphs (for k=20)
         Returns mean validation accuracy across folds.
         """
+        print(f"\n=== EVALUATING ARCHITECTURE ===")
+        print(f"Architecture: {arch}")
+        print(f"Input dim: {input_dim}, Num layers: {num_layers}")
+        
         kf = KFold(n_splits=folds, shuffle=True, random_state=42)
         val_accs = []
 
         # unpack hyperparams
         lr = arch[7]
         batch_size = arch[8]
+        print(f"Learning rate: {lr}, Batch size: {batch_size}")
 
-        for train_idx, val_idx in kf.split(dataset_list):
+        for fold_idx, (train_idx, val_idx) in enumerate(kf.split(dataset_list)):
+            print(f"\nFold {fold_idx + 1}/{folds}")
+            print(f"Train samples: {len(train_idx)}, Val samples: {len(val_idx)}")
+            
             train_dataset = [dataset_list[i] for i in train_idx]
             val_dataset = [dataset_list[i] for i in val_idx]
+            
+            # 데이터 분포 체크
+            train_labels = [dataset_list[i].y.item() for i in train_idx]
+            val_labels = [dataset_list[i].y.item() for i in val_idx]
+            print(f"Train label dist: {np.bincount(train_labels)}")
+            print(f"Val label dist: {np.bincount(val_labels)}")
+            
             train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
             val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
             model = GNNModel(input_dim, arch, num_layers=num_layers, output_dim=1).to(self.device)
+            print(f"Model parameters: {sum(p.numel() for p in model.parameters())}")
+            
             optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=5e-4)
             criterion = nn.BCEWithLogitsLoss()
 
             # training (small number of epochs for search speed)
+            print(f"Training for {train_epochs} epochs...")
             for epoch in range(train_epochs):
                 model.train()
                 total_loss = 0.0
+                batch_count = 0
                 for batch in train_loader:
                     batch = batch.to(self.device)
                     optimizer.zero_grad()
@@ -286,26 +305,214 @@ class Evaluator:
                     loss.backward()
                     optimizer.step()
                     total_loss += loss.item()
+                    batch_count += 1
+                
+                avg_loss = total_loss / batch_count if batch_count > 0 else 0
+                if epoch % 10 == 0 or epoch == train_epochs - 1:
+                    print(f"  Epoch {epoch}: avg_loss = {avg_loss:.4f}")
 
             # validation
             model.eval()
             correct = 0
             total = 0
+            all_preds = []
+            all_labels = []
+            
             with torch.no_grad():
                 for batch in val_loader:
                     batch = batch.to(self.device)
-                    out = model(batch)
-                    preds = (torch.sigmoid(out) >= 0.5).long()
+                    out = model(batch)  # logits
+                    probs = torch.sigmoid(out)  # probabilities
+                    preds = (probs >= 0.5).long()
+                    
+                    all_preds.extend(preds.cpu().numpy())
+                    all_labels.extend(batch.y.cpu().numpy())
+                    
                     correct += (preds == batch.y).sum().item()
                     total += batch.y.size(0)
+                    
             val_acc = correct / total if total > 0 else 0.0
             val_accs.append(val_acc)
+            
+            print(f"  Fold {fold_idx + 1} accuracy: {val_acc:.4f}")
+            print(f"  Predictions dist: {np.bincount(all_preds)}")
+            print(f"  True labels dist: {np.bincount(all_labels)}")
 
         mean_val = float(np.mean(val_accs))
+        std_val = float(np.std(val_accs))
+        print(f"\nFinal: mean_val_acc = {mean_val:.4f} ± {std_val:.4f}")
+        print("=" * 50)
+        
         if verbose:
             print(f"Evaluated arch -> mean_val_acc: {mean_val:.4f}")
         return mean_val
+# 2. AGNNSearch 클래스의 run_search에 디버깅 추가
+def run_search_debug(self):
+    # 1) random starts
+    print("== AGNN SEARCH START ==")
+    print(f"Search space sizes: {[len(cls) for cls in self.ss.action_classes]}")
+    
+    for s in range(self.num_random_starts):
+        arch = self.ss.sample_random_arch(self.num_layers)
+        # ensure lr and batch_size exist as scalars
+        if not isinstance(arch[7], float):
+            arch[7] = float(arch[7])
+        if not isinstance(arch[8], int):
+            arch[8] = int(arch[8])
+            
+        print(f"\nRandom start {s+1} architecture:")
+        print(self.ss.arch_to_string(arch, num_layers=self.num_layers))
+        
+        score = self.evaluator.evaluate_architecture(arch, self.dataset_list, self.input_dim,
+                                                     num_layers=self.num_layers, folds=self.folds,
+                                                     train_epochs=self.train_epochs)
+        print(f"Random start {s+1}: val_acc={score:.4f}")
+        if score > self.best_score:
+            self.best_score = score
+            self.best_arch = arch
+            print("  -> new best (init)")
 
+    print(f"\nInitial best score: {self.best_score}")
+    print("Initial best architecture:")
+    print(self.ss.arch_to_string(self.best_arch, num_layers=self.num_layers))
+    
+    # 2) main iterations
+    for it in range(self.num_iterations):
+        print(f"\n{'='*60}")
+        print(f"ITERATION {it+1}/{self.num_iterations}")
+        print(f"Current best score: {self.best_score:.4f}")
+        
+        entropies = []
+        sampled_actions = {}
+        sampled_log_probs = {}
+
+        # 각 컨트롤러가 실제로 다른 액션을 샘플링하는지 확인
+        for cls_idx, ctrl in enumerate(self.controllers):
+            print(f"\nController {cls_idx} ({self.ss.class_names[cls_idx]}):")
+            
+            # Build subarch indices
+            sub_indices = []
+            for j in range(len(self.ss.action_classes)):
+                if j == cls_idx:
+                    continue
+                if j <= 6:
+                    for l in range(self.num_layers):
+                        val = self.best_arch[j][l]
+                        try:
+                            idx = self.ss.action_classes[j].index(val)
+                        except ValueError:
+                            print(f"Value Error for class {j}, val {val}")
+                            idx = 0
+                        sub_indices.append(idx)
+                else:
+                    val = self.best_arch[j]
+                    try:
+                        idx = self.ss.action_classes[j].index(val)
+                    except ValueError:
+                        print(f"Value Error for global class {j}, val {val}")
+                        idx = 0
+                    sub_indices.append(idx)
+                    
+            if len(sub_indices) == 0:
+                sub_indices = [0]
+                
+            print(f"  Sub-indices: {sub_indices}")
+            sub_tensor = torch.tensor([sub_indices], dtype=torch.long, device=self.device)
+            
+            actions_idx_list, probs_list, log_probs_list = ctrl(sub_tensor)
+            print(f"  Sampled actions: {actions_idx_list}")
+            print(f"  Action values: {[self.ss.action_classes[cls_idx][idx] for idx in actions_idx_list]}")
+            
+            sampled_actions[cls_idx] = actions_idx_list
+            sampled_log_probs[cls_idx] = log_probs_list
+            ent = self.calc_entropy(probs_list)
+            entropies.append(ent)
+            print(f"  Entropy: {ent:.4f}")
+
+        print(f"\nAll entropies: {entropies}")
+        
+        # choose which classes to modify
+        selected = self.select_classes_by_entropy(entropies, num_select=1)
+        if len(selected) == 0:
+            selected = [0]
+            
+        print(f"Selected class: {selected} ({[self.ss.class_names[i] for i in selected]})")
+        
+        # prepare new_actions dict
+        new_actions = {}
+        for cls_idx in selected:
+            new_actions[cls_idx] = sampled_actions[cls_idx]
+            print(f"New actions for class {cls_idx}: {new_actions[cls_idx]}")
+
+        # create offspring and check if it's actually different
+        offspring = self.modify_arch(self.best_arch, selected, new_actions)
+        
+        print(f"\nOffspring architecture:")
+        print(self.ss.arch_to_string(offspring, num_layers=self.num_layers))
+        
+        # 아키텍처가 실제로 바뀌었는지 확인
+        arch_changed = False
+        for i, (old_val, new_val) in enumerate(zip(self.best_arch, offspring)):
+            if old_val != new_val:
+                arch_changed = True
+                print(f"Changed class {i} ({self.ss.class_names[i]}): {old_val} -> {new_val}")
+        
+        if not arch_changed:
+            print("WARNING: Architecture did not change!")
+        
+        val_acc = self.evaluator.evaluate_architecture(offspring, self.dataset_list, self.input_dim,
+                                                      num_layers=self.num_layers, folds=self.folds,
+                                                      train_epochs=self.train_epochs)
+        reward = val_acc - self.best_score
+        print(f"\n[Iter {it+1}/{self.num_iterations}] val_acc={val_acc:.4f} reward={reward:.4f}")
+
+        # REINFORCE update
+        for cls_idx in selected:
+            logps = sampled_log_probs[cls_idx]
+            total_logp = sum([lp.sum() for lp in logps])
+            advantage = reward
+            loss = - (advantage * total_logp)
+            
+            print(f"Controller {cls_idx} update: advantage={advantage:.4f}, loss={loss.item():.4f}")
+            
+            opt = self.controller_opts[cls_idx]
+            opt.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.controllers[cls_idx].parameters(), 1.0)
+            opt.step()
+
+        # if improved, replace best
+        if reward > 0:
+            print("  >>> Offspring better: updating best architecture")
+            self.best_arch = offspring
+            self.best_score = val_acc
+
+        self.arch_history.append(copy.deepcopy(offspring))
+        self.score_history.append(val_acc)
+
+    print(f"\nSearch completed. Best val_acc: {self.best_score}")
+    return self.best_arch, self.best_score
+
+# 3. 데이터셋 분석 함수 추가
+def analyze_dataset(dataset_list):
+    print("=== DATASET ANALYSIS ===")
+    print(f"Total graphs: {len(dataset_list)}")
+    
+    # 라벨 분포
+    labels = [data.y.item() for data in dataset_list]
+    print(f"Label distribution: {np.bincount(labels)}")
+    print(f"Label ratio: {np.mean(labels):.3f}")
+    
+    # 그래프 크기 분포
+    node_counts = [data.x.shape[0] for data in dataset_list]
+    edge_counts = [data.edge_index.shape[1] for data in dataset_list]
+    feature_dim = dataset_list[0].x.shape[1]
+    
+    print(f"Feature dimension: {feature_dim}")
+    print(f"Node count - mean: {np.mean(node_counts):.1f}, std: {np.std(node_counts):.1f}")
+    print(f"Edge count - mean: {np.mean(edge_counts):.1f}, std: {np.std(edge_counts):.1f}")
+    print(f"Node count range: [{min(node_counts)}, {max(node_counts)}]")
+    print("=" * 30)
 # ---------------------------
 # AGNN-style search controller
 # ---------------------------
@@ -371,19 +578,12 @@ class AGNNSearch:
             # if cls is layer-wise (idx <=6), new_actions_per_class[cls_idx] should be length=num_layers list of action indices
             if cls_idx <= 6:
                 indices = new_actions_per_class[cls_idx]  # list of indices len=num_layers
-                # print(cls_idx)
-                # print(indices)
-                # print('-----------------')
                 for l in range(self.num_layers):
                     arch[cls_idx][l] = self.ss.action_classes[cls_idx][indices[l]]
             else:
                 # global param single index
                 idx = new_actions_per_class[cls_idx][0]
-                # print(cls_idx)
-                # print(idx)
-                # print('-----------------')
                 arch[cls_idx] = self.ss.action_classes[cls_idx][idx]
-        # print(arch)
         return arch
 
     def run_search(self):
@@ -498,51 +698,103 @@ class AGNNSearch:
 # ---------------------------
 # Entrypoint that loads user's dataset directory and runs search on k=20
 # ---------------------------
+# def main(dataset_dir, device_str='cpu', num_iterations=20, random_starts=2, train_epochs=40):
+#     set_seed(42)
+#     device = torch.device(device_str)
+#     print("Device:", device)
+
+#     # load dataset structure same as original script: ks folders each containing gcn_dataset.pt
+#     ks = [int(k) for k in os.listdir(dataset_dir) if k.isdigit()]
+#     if 20 not in ks:
+#         raise ValueError("k=20 dataset not found in dataset_dir. Available ks: %s" % sorted(ks))
+
+#     # load dataset k=20 (expected file name: gcn_dataset.pt in folder dataset_dir/20)
+#     path20 = os.path.join(dataset_dir, '20', 'gcn_dataset.pt')
+#     if not os.path.exists(path20):
+#         raise FileNotFoundError(f"Expected {path20} but not found.")
+#     dataset_k20 = torch.load(path20, weights_only=False)
+
+#     graphs = dataset_k20
+
+#     print(f"Loaded k=20 graphs: {len(graphs)} graphs")
+
+#     # search space and searcher
+#     ss = SearchSpace()
+#     # sample an initial arch to shape correctly (all layer-wise parts should be lists)
+#     init_arch = ss.sample_random_arch(num_layers=3)
+#     # normalize global hyperparams to correct types
+#     if not isinstance(init_arch[7], float): # Learning rate
+#         init_arch[7] = float(init_arch[7])
+#     if not isinstance(init_arch[8], int): # Batch size
+#         init_arch[8] = int(init_arch[8])
+
+#     agnn = AGNNSearch(search_space=ss, dataset_list=graphs, input_dim=graphs[0].x.shape[1],
+#                       device=device, num_layers=3, folds=3,
+#                       controller_hidden=64, num_random_starts=random_starts, num_iterations=num_iterations,
+#                       train_epochs=train_epochs)
+#     agnn.best_arch = init_arch
+#     agnn.best_score = agnn.evaluator.evaluate_architecture(init_arch, graphs, graphs[0].x.shape[1],
+#                                                           num_layers=3, folds=3, train_epochs=train_epochs)
+#     print("Starting search with initial val_acc:", agnn.best_score)
+#     best_arch, best_score = agnn.run_search()
+
+#     print("=== FINAL BEST ARCH ===")
+#     print(ss.arch_to_string(best_arch, num_layers=3))
+#     print("Best validation acc:", best_score)
+
+#     # Optionally: train final model on whole dataset using best hyperparams (or use k-fold to get test)
+#     return best_arch, best_score
 def main(dataset_dir, device_str='cpu', num_iterations=20, random_starts=2, train_epochs=40):
     set_seed(42)
     device = torch.device(device_str)
     print("Device:", device)
 
-    # load dataset structure same as original script: ks folders each containing gcn_dataset.pt
+    # load dataset
     ks = [int(k) for k in os.listdir(dataset_dir) if k.isdigit()]
     if 20 not in ks:
         raise ValueError("k=20 dataset not found in dataset_dir. Available ks: %s" % sorted(ks))
 
-    # load dataset k=20 (expected file name: gcn_dataset.pt in folder dataset_dir/20)
     path20 = os.path.join(dataset_dir, '20', 'gcn_dataset.pt')
     if not os.path.exists(path20):
         raise FileNotFoundError(f"Expected {path20} but not found.")
     dataset_k20 = torch.load(path20, weights_only=False)
-
     graphs = dataset_k20
 
     print(f"Loaded k=20 graphs: {len(graphs)} graphs")
+    
+    # 데이터셋 분석 추가
+    analyze_dataset(graphs)
 
     # search space and searcher
     ss = SearchSpace()
-    # sample an initial arch to shape correctly (all layer-wise parts should be lists)
     init_arch = ss.sample_random_arch(num_layers=3)
-    # normalize global hyperparams to correct types
-    if not isinstance(init_arch[7], float): # Learning rate
+    
+    # normalize global hyperparams
+    if not isinstance(init_arch[7], float):
         init_arch[7] = float(init_arch[7])
-    if not isinstance(init_arch[8], int): # Batch size
+    if not isinstance(init_arch[8], int):
         init_arch[8] = int(init_arch[8])
 
     agnn = AGNNSearch(search_space=ss, dataset_list=graphs, input_dim=graphs[0].x.shape[1],
                       device=device, num_layers=3, folds=3,
                       controller_hidden=64, num_random_starts=random_starts, num_iterations=num_iterations,
                       train_epochs=train_epochs)
+    
+    # 초기 아키텍처 평가
     agnn.best_arch = init_arch
     agnn.best_score = agnn.evaluator.evaluate_architecture(init_arch, graphs, graphs[0].x.shape[1],
                                                           num_layers=3, folds=3, train_epochs=train_epochs)
     print("Starting search with initial val_acc:", agnn.best_score)
+    
+    # AGNNSearch 클래스에 디버깅 메서드 추가
+    agnn.run_search = lambda: run_search_debug(agnn)
+    
     best_arch, best_score = agnn.run_search()
 
     print("=== FINAL BEST ARCH ===")
     print(ss.arch_to_string(best_arch, num_layers=3))
     print("Best validation acc:", best_score)
 
-    # Optionally: train final model on whole dataset using best hyperparams (or use k-fold to get test)
     return best_arch, best_score
 
 if __name__ == "__main__":
