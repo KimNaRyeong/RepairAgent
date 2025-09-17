@@ -1,10 +1,32 @@
-python gcn_model.py -d ../data/clustering/fasttext/sentence_vector/100/processed_response/0.96_0.97/label_criteria_1
-python gcn_model.py -d ../data/clustering/fasttext/sentence_vector/100/processed_response/0.96_0.97/label_criteria_2
-python gcn_model.py -d ../data/clustering/fasttext/sentence_vector/100/processed_response/0.96_0.97/label_criteria_3
-python gcn_model.py -d ../data/clustering/fasttext/sentence_vector/100/processed_response/0.96_0.97/label_criteria_4
-python gcn_model.py -d ../data/clustering/fasttext/sentence_vector/100/processed_response/0.96_0.97/label_criteria_5
-python gcn_model.py -d ../data/clustering/fasttext/sentence_vector/100/processed_response/0.96_0.97/label_criteria_6
-python gcn_model.py -d ../data/clustering/fasttext/sentence_vector/100/processed_response/0.96_0.97/label_criteria_7
-python gcn_model.py -d ../data/clustering/fasttext/sentence_vector/100/processed_response/0.96_0.97/label_criteria_8
-python gcn_model.py -d ../data/clustering/fasttext/sentence_vector/100/processed_response/0.96_0.97/label_criteria_9
-python gcn_model.py -d ../data/clustering/fasttext/sentence_vector/100/processed_response/0.96_0.97/label_criteria_10
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_1 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_2 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_3 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_4 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_5 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_6 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_7 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_8 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_9 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_10 --hidden_dim 64 -l 3 -b 0
+
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_1 --hidden_dim 64 -l 5 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_2 --hidden_dim 64 -l 5 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_3 --hidden_dim 64 -l 5 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_4 --hidden_dim 64 -l 5 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_5 --hidden_dim 64 -l 5 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_6 --hidden_dim 64 -l 5 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_7 --hidden_dim 64 -l 5 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_8 --hidden_dim 64 -l 5 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_9 --hidden_dim 64 -l 5 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.96_0.97/plausible_patch/label_criteria_10 --hidden_dim 64 -l 5 -b 0
+
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.95_0.96/plausible_patch/label_criteria_1 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.95_0.96/plausible_patch/label_criteria_2 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.95_0.96/plausible_patch/label_criteria_3 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.95_0.96/plausible_patch/label_criteria_4 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.95_0.96/plausible_patch/label_criteria_5 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.95_0.96/plausible_patch/label_criteria_6 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.95_0.96/plausible_patch/label_criteria_7 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.95_0.96/plausible_patch/label_criteria_8 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.95_0.96/plausible_patch/label_criteria_9 --hidden_dim 64 -l 3 -b 0
+python gcn_model.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.95_0.96/plausible_patch/label_criteria_10 --hidden_dim 64 -l 3 -b 0

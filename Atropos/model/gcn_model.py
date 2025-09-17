@@ -264,7 +264,7 @@ def evaluate_with_specificity(model, loader, device):
     
     return specificity
 
-def train_and_test_model(dataset, criterion, output_dim, K, kf, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, dataset_name, directory):
+def train_and_test_model(dataset, criterion, output_dim, K, kf, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, dataset_name, result_dir):
     print(f"Training and testing with {dataset_name}")
     with open(result_file, "a+") as rf:
         rf.write(f"{dataset_name.split('_')[-1]}\n")
@@ -330,7 +330,9 @@ def train_and_test_model(dataset, criterion, output_dim, K, kf, lr, batch_size, 
         mean_roc_auc = auc(mean_fpr, mean_tpr)
 
         # Plot accuracy graphs over epochs
-        graph_dir = os.path.join('../results/training_graphs', directory)
+        parsed_dir = result_dir.split('/')
+        graph_dir = os.path.join('../results/training_graphs', '/'.join(parsed_dir[2:]))
+
         if not os.path.exists(graph_dir):
             os.makedirs(graph_dir)
 
@@ -380,20 +382,39 @@ def train_and_test_model(dataset, criterion, output_dim, K, kf, lr, batch_size, 
 
 
 
-def main(dataset_dir):
+def main(dataset_dir, hidden_dim, num_layer, balanced):
     set_seed(42)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     directory = '/'.join(dataset_dir.split('/')[2:])
     # print(directory)
-    result_dir = os.path.join('../results', directory)
+    result_dir = os.path.join('../results', directory, f'{hidden_dim}h_{num_layer}l')
+
+    if balanced:
+        result_dir = os.path.join(result_dir, 'balanced')
     ks = [int(k) for k in os.listdir(dataset_dir)]
     # ks = [100]
 
     dataset_FA = {}
     for k in ks:
-        dataset_FA[k] = torch.load(os.path.join(dataset_dir, str(k), "gcn_dataset.pt"), weights_only = False)
+        if balanced:
+            dataset_for_k = torch.load(os.path.join(dataset_dir, str(k), "gcn_dataset.pt"), weights_only = False)
+            
+            pos_data = [d for d in dataset_for_k if int(d.y.item()) == 1]
+            neg_data = [d for d in dataset_for_k if int(d.y.item()) == 0]
+
+            num_pos = len(pos_data)
+            num_neg = len(neg_data)
+
+            if num_neg < num_pos:
+                raise ValueError(f"The number of data with label 1 is bigger than the data with label 0")
+            
+            sampled_neg_data = random.sample(neg_data, num_pos)
+            dataset_FA[k] = pos_data + sampled_neg_data
+            random.shuffle(dataset_FA[k])
+        else:
+            dataset_FA[k] = torch.load(os.path.join(dataset_dir, str(k), "gcn_dataset.pt"), weights_only = False)
 
     if not os.path.exists(result_dir):
         os.makedirs(result_dir)
@@ -413,19 +434,24 @@ def main(dataset_dir):
     kf = KFold(n_splits=K, shuffle=True, random_state=42)
     lr = 0.001
     batch_size = 32
-    hidden_dim = 32
+    hidden_dim = hidden_dim
     dropout_p = 0.8
-    num_layer = 2
+    num_layer = num_layer
     num_epochs = 100
     
-    train_and_test_model(dataset_FA, criterion, output_dim, K, kf, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, "dataset_FA", directory = directory)
+    train_and_test_model(dataset_FA, criterion, output_dim, K, kf, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, "dataset_FA", result_dir)
 
 
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--dataset_dir', default='../data/clustering/fasttext/sentence_vector/100/raw_response/0.9_0.9/label_criteria_5') # should be modified
+    parser.add_argument('-d', '--dataset_dir', default='../data/clustering/fasttext/sentence_vector/100/processed_response/0.96_0.97/label_criteria_5') # should be modified
+    parser.add_argument('--hidden_dim', default=64, type=int)
+    parser.add_argument('-l', '--num_layer', default=3, type=int)
+    parser.add_argument('-b', '--balanced', default=0, type=int)
     args = parser.parse_args()
 
-    main(args.dataset_dir)
+    balanced = True if args.balanced == 1 else False
+
+    main(args.dataset_dir, args.hidden_dim, args.num_layer, balanced)
