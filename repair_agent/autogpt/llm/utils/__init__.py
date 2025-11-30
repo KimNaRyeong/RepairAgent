@@ -17,6 +17,7 @@ from ..base import (
 from ..providers import openai as iopenai
 from ..providers.openai import (
     OPEN_AI_CHAT_MODELS,
+    TOGETHER_AI_CHAT_MODELS,
     OpenAIFunctionCall,
     OpenAIFunctionSpec,
     count_openai_functions_tokens,
@@ -120,7 +121,7 @@ def create_chat_completion(
     if max_tokens is None:
         prompt_tlength = prompt.token_length
         max_tokens = (
-            min(OPEN_AI_CHAT_MODELS[model].max_tokens - prompt_tlength - 1, 4000)
+            min(TOGETHER_AI_CHAT_MODELS[model].max_tokens - prompt_tlength - 1, 4000)
         )  # the -1 is just here because we have a bug and we don't know how to fix it. When using gpt-4-0314 we get a token error.
         logger.debug(f"Prompt length: {prompt_tlength} tokens")
         if functions:
@@ -183,8 +184,16 @@ def create_chat_completion(
         # TODO: function call support in plugin.on_response()
         content = plugin.on_response(content)
 
+    # Get model info from either OpenAI or TogetherAI models
+    if model in OPEN_AI_CHAT_MODELS:
+        model_info = OPEN_AI_CHAT_MODELS[model]
+    elif model in TOGETHER_AI_CHAT_MODELS:
+        model_info = TOGETHER_AI_CHAT_MODELS[model]
+    else:
+        raise ValueError(f"Unknown model: {model}")
+
     return ChatModelResponse(
-        model_info=OPEN_AI_CHAT_MODELS[model],
+        model_info=model_info,
         content=content,
         function_call=OpenAIFunctionCall(
             name=function_call["name"], arguments=function_call["arguments"]

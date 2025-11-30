@@ -35,17 +35,25 @@ class ApiManager(metaclass=Singleton):
         model (str): The model used for the API call.
         """
         # the .model property in API responses can contain version suffixes like -v2
-        from autogpt.llm.providers.openai import OPEN_AI_MODELS
+        from autogpt.llm.providers.openai import OPEN_AI_MODELS, TOGETHER_AI_MODELS
 
         model = model[:-3] if model.endswith("-v2") else model
-        model_info = OPEN_AI_MODELS[model]
+
+        # Try to find model in either OpenAI or TogetherAI models
+        if model in OPEN_AI_MODELS:
+            model_info = OPEN_AI_MODELS[model]
+        elif model in TOGETHER_AI_MODELS:
+            model_info = TOGETHER_AI_MODELS[model]
+        else:
+            logger.warn(f"Model {model} not found in OPEN_AI_MODELS or TOGETHER_AI_MODELS. Skipping cost update.")
+            return
 
         self.total_prompt_tokens += prompt_tokens
         self.total_completion_tokens += completion_tokens
-        self.total_cost += prompt_tokens * model_info.prompt_token_cost / 1000
+        self.total_cost += prompt_tokens * model_info.token_cost_per_1m / 1000000
         if issubclass(type(model_info), CompletionModelInfo):
             self.total_cost += (
-                completion_tokens * model_info.completion_token_cost / 1000
+                completion_tokens * model_info.completion_token_cost / 1000000
             )
 
         logger.debug(f"Total running cost: ${self.total_cost:.3f}")

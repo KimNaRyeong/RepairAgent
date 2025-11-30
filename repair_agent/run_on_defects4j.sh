@@ -9,7 +9,12 @@ for LANG in en_AU.UTF-8 en_GB.UTF-8 C.UTF-8 C; do
 done
 export LC_COLLATE=C
 
-python3 experimental_setups/increment_experiment.py
+# Get model name from third argument, default to llama3
+MODEL_NAME="${3:-llama3}"
+# Convert model name to folder-safe format (replace : with _)
+MODEL_PREFIX="${MODEL_NAME//:/_}"
+
+python3 experimental_setups/increment_experiment.py "$MODEL_PREFIX"
 python3 construct_commands_descriptions.py
 input="$1"
 timeout_seconds=7200 # 2 hours
@@ -20,12 +25,12 @@ do
     if [[ -z "$line" ]]; then
         continue
     fi
-    
+
     tuple=($line)
     echo ${tuple[0]}, ${tuple[1]}
     python3 prepare_ai_settings.py "${tuple[0]}" "${tuple[1]}"
     python3 checkout_py.py "${tuple[0]}" "${tuple[1]}"
-    timeout $timeout_seconds ./run.sh --ai-settings ai_settings.yaml --gpt3only -c -l 40 -m json_file --experiment-file "$2"
+    timeout $timeout_seconds ./run.sh --ai-settings ai_settings.yaml --model "$MODEL_NAME" -c -l 40 -m json_file --experiment-file "$2"
 
     if [ $? -eq 124 ]; then
       echo "Timeout on ${tuple[0]} ${tuple[1]}"

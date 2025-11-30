@@ -27,40 +27,40 @@ OPEN_AI_CHAT_MODELS = {
     for info in [
         ChatModelInfo(
             name="gpt-3.5-turbo-16k-0301 ",
-            prompt_token_cost=0.003,
+            token_cost_per_1m=0.003,  # prompt cost
             completion_token_cost=0.004,
             max_tokens=16384,
             supports_functions=True,
         ),
         ChatModelInfo(
             name="gpt-4-0314",
-            prompt_token_cost=0.03,
+            token_cost_per_1m=0.03,  # prompt cost
             completion_token_cost=0.06,
             max_tokens=8192,
         ),
         ChatModelInfo(
             name="gpt-4-0301",
-            prompt_token_cost=0.03,
+            token_cost_per_1m=0.03,  # prompt cost
             completion_token_cost=0.06,
             max_tokens=8191,
             supports_functions=True,
         ),
         ChatModelInfo(
             name="gpt-4-32k-0301",
-            prompt_token_cost=0.06,
+            token_cost_per_1m=0.06,  # prompt cost
             completion_token_cost=0.12,
             max_tokens=32768,
         ),
         ChatModelInfo(
             name="gpt-4-32k-0301",
-            prompt_token_cost=0.06,
+            token_cost_per_1m=0.06,  # prompt cost
             completion_token_cost=0.12,
             max_tokens=32768,
             supports_functions=True,
         ),
         ChatModelInfo(
             name="gpt-3.5-turbo-0125",
-            prompt_token_cost=0.001,
+            token_cost_per_1m=0.001,  # prompt cost
             completion_token_cost=0.002,
             max_tokens=16000,
             supports_functions=True,
@@ -68,46 +68,67 @@ OPEN_AI_CHAT_MODELS = {
 
     ]
 }
+
+TOGETHER_AI_CHAT_MODELS = {
+    info.name: info
+    for info in [
+        ChatModelInfo(
+            name="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+            token_cost_per_1m=0.00018,  # $0.18/M (prompt cost)
+            completion_token_cost=0.00018,  # $0.18/M
+            max_tokens=131072,
+        ),
+        ChatModelInfo(
+            name="meta-llama/Meta-Llama-3-70B-Instruct-Turbo",
+            token_cost_per_1m=0.00088,  # $0.88/M (prompt cost)
+            completion_token_cost=0.00088,  # $0.88/M
+            max_tokens=8000,
+        )
+    ]
+}
+
 # Set aliases for rolling model IDs
 chat_model_mapping = {
-    "gpt-3.5-turbo": "gpt-3.5-turbo-0125",
-    "gpt-3.5-turbo-16k": "gpt-3.5-turbo-0125",
-    "gpt-4": "gpt-4-0301",
-    "gpt-4-32k": "gpt-4-32k-0301",
+    "llama3": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+    "llama3:8b": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+    "llama3:70b": "meta-llama/Meta-Llama-3-70B-Instruct-Turbo",
+    "llama3-70b": "meta-llama/Meta-Llama-3-70B-Instruct-Turbo",
 }
 for alias, target in chat_model_mapping.items():
-    alias_info = ChatModelInfo(**OPEN_AI_CHAT_MODELS[target].__dict__)
+    alias_info = ChatModelInfo(**TOGETHER_AI_CHAT_MODELS[target].__dict__)
     alias_info.name = alias
-    OPEN_AI_CHAT_MODELS[alias] = alias_info
+    TOGETHER_AI_CHAT_MODELS[alias] = alias_info
 
-OPEN_AI_TEXT_MODELS = {
-    info.name: info
-    for info in [
-        TextModelInfo(
-            name="text-davinci-003",
-            prompt_token_cost=0.02,
-            completion_token_cost=0.02,
-            max_tokens=4097,
-        ),
-    ]
-}
+# OPEN_AI_TEXT_MODELS = {
+#     info.name: info
+#     for info in [
+#         TextModelInfo(
+#             name="text-davinci-003",
+#             prompt_token_cost=0.02,
+#             completion_token_cost=0.02,
+#             max_tokens=4097,
+#         ),
+#     ]
+# }
 
-OPEN_AI_EMBEDDING_MODELS = {
-    info.name: info
-    for info in [
-        EmbeddingModelInfo(
-            name="text-embedding-ada-002",
-            prompt_token_cost=0.0001,
-            max_tokens=8191,
-            embedding_dimensions=1536,
-        ),
-    ]
-}
+# OPEN_AI_EMBEDDING_MODELS = {
+#     info.name: info
+#     for info in [
+#         EmbeddingModelInfo(
+#             name="text-embedding-ada-002",
+#             prompt_token_cost=0.0001,
+#             max_tokens=8191,
+#             embedding_dimensions=1536,
+#         ),
+#     ]
+# }
 
 OPEN_AI_MODELS: dict[str, ChatModelInfo | EmbeddingModelInfo | TextModelInfo] = {
     **OPEN_AI_CHAT_MODELS,
-    **OPEN_AI_TEXT_MODELS,
-    **OPEN_AI_EMBEDDING_MODELS,
+}
+
+TOGETHER_AI_MODELS: dict[str, ChatModelInfo | EmbeddingModelInfo | TextModelInfo] = {
+    **TOGETHER_AI_CHAT_MODELS,
 }
 
 

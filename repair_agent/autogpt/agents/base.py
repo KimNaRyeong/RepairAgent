@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from autogpt.models.command_registry import CommandRegistry
 
 from autogpt.llm.base import ChatModelResponse, ChatSequence, Message
-from autogpt.llm.providers.openai import OPEN_AI_CHAT_MODELS, get_openai_command_specs
+from autogpt.llm.providers.openai import TOGETHER_AI_CHAT_MODELS, get_openai_command_specs
 from autogpt.llm.utils import count_message_tokens, create_chat_completion
 from autogpt.logs import logger
 from autogpt.memory.message_history import MessageHistory
@@ -103,7 +103,7 @@ class BaseAgent(metaclass=ABCMeta):
         """
 
         llm_name = self.config.smart_llm if self.big_brain else self.config.fast_llm
-        self.llm = OPEN_AI_CHAT_MODELS[llm_name]
+        self.llm = TOGETHER_AI_CHAT_MODELS[llm_name]
         """The LLM that the agent uses to think."""
 
         self.send_token_limit = send_token_limit or self.llm.max_tokens * 3 / 4

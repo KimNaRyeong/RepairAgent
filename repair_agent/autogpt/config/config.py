@@ -13,7 +13,7 @@ from colorama import Fore
 from pydantic import Field, validator
 
 from autogpt.core.configuration.schema import Configurable, SystemSettings
-from autogpt.llm.providers.openai import OPEN_AI_CHAT_MODELS
+from autogpt.llm.providers.openai import OPEN_AI_CHAT_MODELS, TOGETHER_AI_CHAT_MODELS
 from autogpt.plugins.plugins_config import PluginsConfig
 
 AI_SETTINGS_FILE = "ai_settings.yaml"
@@ -21,8 +21,8 @@ AZURE_CONFIG_FILE = "azure.yaml"
 PLUGINS_CONFIG_FILE = "plugins_config.yaml"
 PROMPT_SETTINGS_FILE = "prompt_settings.yaml"
 
+GPT_3_MODEL = "gpt-3.5-turbo"
 GPT_4_MODEL = "gpt-4"
-GPT_3_MODEL = "gpt-3.5-turbo-0125"
 
 
 class Config(SystemSettings, arbitrary_types_allowed=True):
@@ -125,6 +125,10 @@ class Config(SystemSettings, arbitrary_types_allowed=True):
     use_azure: bool = False
     azure_config_file: Optional[str] = AZURE_CONFIG_FILE
     azure_model_to_deployment_id_map: Optional[Dict[str, str]] = None
+    # TogetherAI
+    use_together_ai: bool = False
+    together_ai_api_key: Optional[str] = None
+    together_ai_api_base: str = "https://api.together.xyz/v1"
     # Elevenlabs
     elevenlabs_api_key: Optional[str] = None
     # Github
@@ -152,10 +156,18 @@ class Config(SystemSettings, arbitrary_types_allowed=True):
     def validate_openai_functions(cls, v: bool, values: dict[str, Any]):
         if v:
             smart_llm = values["smart_llm"]
-            assert OPEN_AI_CHAT_MODELS[smart_llm].supports_functions, (
-                f"Model {smart_llm} does not support OpenAI Functions. "
-                "Please disable OPENAI_FUNCTIONS or choose a suitable model."
-            )
+            # Check if model is in OpenAI models (functions only supported by OpenAI)
+            if smart_llm in OPEN_AI_CHAT_MODELS:
+                assert OPEN_AI_CHAT_MODELS[smart_llm].supports_functions, (
+                    f"Model {smart_llm} does not support OpenAI Functions. "
+                    "Please disable OPENAI_FUNCTIONS or choose a suitable model."
+                )
+            else:
+                # TogetherAI models don't support OpenAI Functions
+                raise ValueError(
+                    f"Model {smart_llm} does not support OpenAI Functions. "
+                    "Please disable OPENAI_FUNCTIONS or use an OpenAI model."
+                )
 
     def get_openai_credentials(self, model: str) -> dict[str, str]:
         credentials = {
@@ -166,7 +178,17 @@ class Config(SystemSettings, arbitrary_types_allowed=True):
         if self.use_azure:
             azure_credentials = self.get_azure_credentials(model)
             credentials.update(azure_credentials)
+        elif self.use_together_ai:
+            together_credentials = self.get_together_ai_credentials(model)
+            credentials.update(together_credentials)
         return credentials
+
+    def get_together_ai_credentials(self, model: str) -> dict[str, str]:
+        """Get the kwargs for the TogetherAI API."""
+        return {
+            "api_key": self.together_ai_api_key,
+            "api_base": self.together_ai_api_base,
+        }
 
     def get_azure_credentials(self, model: str) -> dict[str, str]:
         """Get the kwargs for the Azure API."""
@@ -242,6 +264,9 @@ class ConfigBuilder(Configurable[Config]):
             "openai_api_key": os.getenv("OPENAI_API_KEY"),
             "use_azure": os.getenv("USE_AZURE") == "True",
             "azure_config_file": os.getenv("AZURE_CONFIG_FILE", AZURE_CONFIG_FILE),
+            "use_together_ai": os.getenv("USE_TOGETHER_AI") == "True",
+            "together_ai_api_key": os.getenv("TOGETHER_AI_API_KEY"),
+            "together_ai_api_base": os.getenv("TOGETHER_AI_API_BASE", "https://api.together.xyz/v1"),
             "execute_local_commands": os.getenv("EXECUTE_LOCAL_COMMANDS", "False")
             == "True",
             "restrict_to_workspace": os.getenv("RESTRICT_TO_WORKSPACE", "True")
