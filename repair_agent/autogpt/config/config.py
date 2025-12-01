@@ -129,6 +129,7 @@ class Config(SystemSettings, arbitrary_types_allowed=True):
     use_together_ai: bool = False
     together_ai_api_key: Optional[str] = None
     together_ai_api_base: str = "https://api.together.xyz/v1"
+    experiments_list_file: str = "experimental_setups/experiments_list.txt"
     # Elevenlabs
     elevenlabs_api_key: Optional[str] = None
     # Github
@@ -178,7 +179,8 @@ class Config(SystemSettings, arbitrary_types_allowed=True):
         if self.use_azure:
             azure_credentials = self.get_azure_credentials(model)
             credentials.update(azure_credentials)
-        elif self.use_together_ai:
+        elif self.use_together_ai and model in TOGETHER_AI_CHAT_MODELS:
+            # Only use TogetherAI credentials if the model is actually a TogetherAI model
             together_credentials = self.get_together_ai_credentials(model)
             credentials.update(together_credentials)
         return credentials
@@ -267,6 +269,7 @@ class ConfigBuilder(Configurable[Config]):
             "use_together_ai": os.getenv("USE_TOGETHER_AI") == "True",
             "together_ai_api_key": os.getenv("TOGETHER_AI_API_KEY"),
             "together_ai_api_base": os.getenv("TOGETHER_AI_API_BASE", "https://api.together.xyz/v1"),
+            "experiments_list_file": os.getenv("EXPERIMENTS_LIST_FILE", "experimental_setups/experiments_list.txt"),
             "execute_local_commands": os.getenv("EXECUTE_LOCAL_COMMANDS", "False")
             == "True",
             "restrict_to_workspace": os.getenv("RESTRICT_TO_WORKSPACE", "True")

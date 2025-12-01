@@ -90,6 +90,18 @@ def create_config(
         config.fast_llm = model_name
         config.smart_llm = model_name
         logger.typewriter_log("TogetherAI Mode: ", Fore.CYAN, "ENABLED")
+    elif model == 'gpt-oss' or model == 'gpt-oss-120b':
+        model_name = "openai/gpt-oss-120b"
+        logger.typewriter_log("LLM MODEL: ", Fore.GREEN, model_name)
+        config.fast_llm = model_name
+        config.smart_llm = model_name
+        logger.typewriter_log("TogetherAI Mode: ", Fore.CYAN, "ENABLED")
+    elif model == 'gpt-3.5-turbo-0125':
+        model_name = "gpt-3.5-turbo-0125"
+        logger.typewriter_log("LLM MODEL: ", Fore.GREEN, model_name)
+        config.fast_llm = model_name
+        config.smart_llm = model_name
+        logger.typewriter_log("OpenAI Mode: ", Fore.CYAN, "ENABLED")
 
     if memory_type:
         supported_memory = get_supported_memory_backends()

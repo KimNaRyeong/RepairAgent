@@ -6,7 +6,10 @@ model_prefix = sys.argv[1] if len(sys.argv) > 1 else ""
 if model_prefix:
     model_prefix = model_prefix + "_"
 
-with open("experimental_setups/experiments_list.txt", "r+") as expl:
+# Get experiments list file path from command line argument, default to experiments_list.txt
+experiments_list_file = sys.argv[2] if len(sys.argv) > 2 else "experimental_setups/experiments_list.txt"
+
+with open(experiments_list_file, "r+") as expl:
     exps = expl.read().splitlines()
     #print(exps)
     if exps:

@@ -1,10 +1,10 @@
-./run_on_defects4j.sh experimental_setups/bugs_list_jsoup hyperparams.json
-./run_on_defects4j.sh experimental_setups/bugs_list_jsoup hyperparams.json
-./run_on_defects4j.sh experimental_setups/bugs_list_jsoup hyperparams.json
-./run_on_defects4j.sh experimental_setups/bugs_list_jsoup hyperparams.json
-./run_on_defects4j.sh experimental_setups/bugs_list_jsoup hyperparams.json
-./run_on_defects4j.sh experimental_setups/bugs_list_jsoup hyperparams.json
-./run_on_defects4j.sh experimental_setups/bugs_list_jsoup hyperparams.json
-./run_on_defects4j.sh experimental_setups/bugs_list_jsoup hyperparams.json
-./run_on_defects4j.sh experimental_setups/bugs_list_jsoup hyperparams.json
-./run_on_defects4j.sh experimental_setups/bugs_list_jsoup hyperparams.json
+./run_on_defects4j.sh ./experimental_setups/bugs_list_chart_all hyperparams.json llama3:70b
+./run_on_defects4j.sh ./experimental_setups/bugs_list_chart_all hyperparams.json llama3:70b
+./run_on_defects4j.sh ./experimental_setups/bugs_list_chart_all hyperparams.json llama3:70b
+./run_on_defects4j.sh ./experimental_setups/bugs_list_chart_all hyperparams.json llama3:70b
+./run_on_defects4j.sh ./experimental_setups/bugs_list_chart_all hyperparams.json llama3:70b
+./run_on_defects4j.sh ./experimental_setups/bugs_list_chart_all hyperparams.json llama3:70b
+./run_on_defects4j.sh ./experimental_setups/bugs_list_chart_all hyperparams.json llama3:70b
+./run_on_defects4j.sh ./experimental_setups/bugs_list_chart_all hyperparams.json llama3:70b
+./run_on_defects4j.sh ./experimental_setups/bugs_list_chart_all hyperparams.json llama3:70b
+./run_on_defects4j.sh ./experimental_setups/bugs_list_chart_all hyperparams.json llama3:70b

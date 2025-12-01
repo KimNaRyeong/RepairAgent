@@ -14,7 +14,13 @@ MODEL_NAME="${3:-llama3}"
 # Convert model name to folder-safe format (replace : with _)
 MODEL_PREFIX="${MODEL_NAME//:/_}"
 
-python3 experimental_setups/increment_experiment.py "$MODEL_PREFIX"
+# Get experiments list file from fourth argument, default to experimental_setups/experiments_list.txt
+EXPERIMENTS_LIST="${4:-experimental_setups/experiments_list.txt}"
+
+# Export as environment variable so the agent can use it
+export EXPERIMENTS_LIST_FILE="$EXPERIMENTS_LIST"
+
+python3 experimental_setups/increment_experiment.py "$MODEL_PREFIX" "$EXPERIMENTS_LIST"
 python3 construct_commands_descriptions.py
 input="$1"
 timeout_seconds=7200 # 2 hours

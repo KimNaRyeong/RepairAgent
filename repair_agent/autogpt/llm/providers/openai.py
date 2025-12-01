@@ -34,8 +34,8 @@ OPEN_AI_CHAT_MODELS = {
         ),
         ChatModelInfo(
             name="gpt-4-0314",
-            token_cost_per_1m=0.03,  # prompt cost
-            completion_token_cost=0.06,
+            token_cost_per_1m=30,  # prompt cost
+            completion_token_cost=60,
             max_tokens=8192,
         ),
         ChatModelInfo(
@@ -60,8 +60,8 @@ OPEN_AI_CHAT_MODELS = {
         ),
         ChatModelInfo(
             name="gpt-3.5-turbo-0125",
-            token_cost_per_1m=0.001,  # prompt cost
-            completion_token_cost=0.002,
+            token_cost_per_1m=0.5,  # prompt cost
+            completion_token_cost=1.5,
             max_tokens=16000,
             supports_functions=True,
         )
@@ -74,15 +74,21 @@ TOGETHER_AI_CHAT_MODELS = {
     for info in [
         ChatModelInfo(
             name="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-            token_cost_per_1m=0.00018,  # $0.18/M (prompt cost)
-            completion_token_cost=0.00018,  # $0.18/M
+            token_cost_per_1m=0.18,  # $0.18 per 1M tokens (prompt cost)
+            completion_token_cost=0.18,  # $0.18 per 1M tokens
             max_tokens=131072,
         ),
         ChatModelInfo(
             name="meta-llama/Meta-Llama-3-70B-Instruct-Turbo",
-            token_cost_per_1m=0.00088,  # $0.88/M (prompt cost)
-            completion_token_cost=0.00088,  # $0.88/M
+            token_cost_per_1m=0.88,  # $0.88 per 1M tokens (prompt cost)
+            completion_token_cost=0.88,  # $0.88 per 1M tokens
             max_tokens=8000,
+        ),
+        ChatModelInfo(
+            name="openai/gpt-oss-120b",
+            token_cost_per_1m=0.15,  # $0.15 per 1M tokens (prompt cost)
+            completion_token_cost=0.60,  # $0.60 per 1M tokens
+            max_tokens=8192,
         )
     ]
 }
@@ -93,6 +99,8 @@ chat_model_mapping = {
     "llama3:8b": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
     "llama3:70b": "meta-llama/Meta-Llama-3-70B-Instruct-Turbo",
     "llama3-70b": "meta-llama/Meta-Llama-3-70B-Instruct-Turbo",
+    "gpt-oss": "openai/gpt-oss-120b",
+    "gpt-oss-120b": "openai/gpt-oss-120b",
 }
 for alias, target in chat_model_mapping.items():
     alias_info = ChatModelInfo(**TOGETHER_AI_CHAT_MODELS[target].__dict__)

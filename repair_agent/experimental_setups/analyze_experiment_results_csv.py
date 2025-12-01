@@ -1,4 +1,4 @@
-import os
+import os, csv
 from prettytable import PrettyTable
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.pdfgen import canvas
@@ -19,6 +19,8 @@ def analyze_experiment(experiment_folder):
     table = PrettyTable()
     table.field_names = ["Log File", "Correctly Fixed", "Suggested Fixes", "Number of Queries"]
     table.align["Log File"] = "l"
+
+    csv_data = [["Log File", "Correctly Fixed", "Suggested Fixes", "Number of Queries"]]
 
     correctly_fixed_bugs = 0
     total_suggested_fixes = 0
@@ -51,10 +53,11 @@ def analyze_experiment(experiment_folder):
 
             # Add rows to the table without color
             table.add_row([log_file.replace("prompt_history_", ""), "Yes" if is_correctly_fixed else "No", num_suggested_fixes, num_queries])
+            csv_data.append([log_file.replace("prompt_history_", ""), "Yes" if is_correctly_fixed else "No", num_suggested_fixes, num_queries])
             if is_correctly_fixed:
                 all_correctly_fixed.append(log_file.replace("prompt_history_", "").replace("_", " "))
                 detailed_fixed_main.append(experiment_folder + " " + log_file.replace("prompt_history_", "").replace("_", " "))
-    return num_log_files, table, correctly_fixed_bugs, total_suggested_fixes, total_queries, all_suggested_fixes
+    return num_log_files, table, correctly_fixed_bugs, total_suggested_fixes, total_queries, all_suggested_fixes, csv_data
 
 
 def generate_pdf(experiment_folder, num_log_files, table, correctly_fixed_bugs, total_suggested_fixes):
@@ -115,15 +118,27 @@ def write_to_text_file(experiment_folder, num_log_files, table, correctly_fixed_
 
     print(f"Results saved to {text_filename}")
 
+def save_to_csv(experiment_folder, csv_data):
+    csv_filename = f"{experiment_folder}_results.csv"
+    
+    with open(csv_filename, 'w', newline='', encoding='utf-8') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerows(csv_data)
+    
+    print(f"CSV Results saved to {csv_filename}")
+
 def main():
-    with open('experiments_list.txt', 'r') as experiments_list_file:
-        experiment_folders = experiments_list_file.read().splitlines()
+    # with open('experiments_list.txt', 'r') as experiments_list_file:
+    #     experiment_folders = experiments_list_file.read().splitlines()
+    # experiment_folders = ['experiment_1', 'experiment_2', 'experiment_3', 'experiment_4', 'experiment_5', 'experiment_6', 'experiment_7', 'experiment_8', 'experiment_9', 'experiment_10']
+    experiment_folders = ['llama3_70b_experiment_1']
 
     total_correctly_fixed_bugs = 0
     total_suggested_fixes = 0
 
     for experiment_folder in experiment_folders:
-        num_log_files, table, correctly_fixed_bugs, suggested_fixes, total_queries, all_suggested_fixes = analyze_experiment(experiment_folder)
+        num_log_files, table, correctly_fixed_bugs, suggested_fixes, total_queries, all_suggested_fixes, csv_data = analyze_experiment(experiment_folder)
+        save_to_csv(experiment_folder, csv_data)
 
         #print(f"Experiment: {experiment_folder}")
         #print(f"Number of log files: {num_log_files}")
@@ -137,24 +152,27 @@ def main():
             pass
             #print(f"\nSuggested Fixes in Log File {idx}:\n{suggested_fixes_text}\n")
 
-        #generate_pdf(experiment_folder, num_log_files, table, correctly_fixed_bugs, suggested_fixes, total_queries)
+        # generate_pdf(experiment_folder, num_log_files, table, correctly_fixed_bugs, suggested_fixes, total_queries)
+        generate_pdf(experiment_folder, num_log_files, table, correctly_fixed_bugs, suggested_fixes)
         write_to_text_file(experiment_folder, num_log_files, table, correctly_fixed_bugs, suggested_fixes, all_suggested_fixes)
+        # print(correctly_fixed_bugs)
+        # print(table)
 
 
-    #print(f"Total Correctly Fixed Bugs Across Experiments: {total_correctly_fixed_bugs}")
-    #print(f"Grand Total Suggested Fixes Across Experiments: {total_suggested_fixes}")
+    print(f"Total Correctly Fixed Bugs Across Experiments: {total_correctly_fixed_bugs}")
+    print(f"Grand Total Suggested Fixes Across Experiments: {total_suggested_fixes}")
 
 if __name__ == "__main__":
     main()
-    print(len(set(all_correctly_fixed)))
-    print("\n".join(list(set(all_correctly_fixed))))
-    with open("fixed_so_far") as fsf:
-        fixed_so_far = fsf.read().splitlines()
+    # print(len(set(all_correctly_fixed)))
+    # print("\n".join(list(set(all_correctly_fixed))))
+    # with open("fixed_so_far") as fsf:
+    #     fixed_so_far = fsf.read().splitlines()
 
-    fixed_so_far += all_correctly_fixed
+    # fixed_so_far += all_correctly_fixed
 
-    with open("fixed_so_far", "w") as fsf:
-        fsf.write("\n".join(list(set(fixed_so_far))))
+    # with open("fixed_so_far", "w") as fsf:
+    #     fsf.write("\n".join(list(set(fixed_so_far))))
 
-    with open("detailed_fixed_main", "w") as dfm:
-        dfm.write("\n".join(list(set(detailed_fixed_main)))) 
+    # with open("detailed_fixed_main", "w") as dfm:
+    #     dfm.write("\n".join(list(set(detailed_fixed_main)))) 

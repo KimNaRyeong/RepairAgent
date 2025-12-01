@@ -46,7 +46,7 @@ def count_message_tokens(
         tokens_per_message = 3
         tokens_per_name = 1
         encoding_model = "gpt-4"
-    elif model.startswith("meta-llama/") or model.startswith("mistralai/") or model.startswith("Qwen/") or model.startswith("google/") or model.startswith("databricks/") or "llama" in model.lower():
+    elif model.startswith("meta-llama/") or model.startswith("mistralai/") or model.startswith("Qwen/") or model.startswith("google/") or model.startswith("databricks/") or model.startswith("openai/") or "llama" in model.lower() or "gpt-oss" in model.lower():
         # TogetherAI models - use approximation with cl100k_base
         tokens_per_message = 0
         tokens_per_name = 0
