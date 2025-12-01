@@ -1,19 +1,31 @@
 import os
+import sys
 
-with open("experimental_setups/experiments_list.txt", "r+") as expl:
+# Get model name from command line argument, default to empty string
+model_prefix = sys.argv[1] if len(sys.argv) > 1 else ""
+if model_prefix:
+    model_prefix = model_prefix + "_"
+
+# Get experiments list file path from command line argument, default to experiments_list.txt
+experiments_list_file = sys.argv[2] if len(sys.argv) > 2 else "experimental_setups/experiments_list.txt"
+
+with open(experiments_list_file, "r+") as expl:
     exps = expl.read().splitlines()
     #print(exps)
     if exps:
-        last_exp = int(exps[-1].split("_")[1])
+        # Extract the number from the last experiment (supports both "experiment_X" and "model_experiment_X" format)
+        last_parts = exps[-1].split("_")
+        last_exp = int(last_parts[-1])
     else:
         last_exp = 0
 
-    print("Creating experiment folder:", last_exp+1)
-    expl.write("experiment_{}\n".format(last_exp + 1))
-    os.mkdir("experimental_setups/experiment_{}".format(last_exp + 1))
-    os.mkdir("experimental_setups/experiment_{}/logs".format(last_exp + 1))
-    os.mkdir("experimental_setups/experiment_{}/responses".format(last_exp + 1))
-    os.mkdir("experimental_setups/experiment_{}/external_fixes".format(last_exp + 1))
-    os.mkdir("experimental_setups/experiment_{}/saved_contexts".format(last_exp + 1))
-    os.mkdir("experimental_setups/experiment_{}/mutations_history".format(last_exp + 1))
-    os.mkdir("experimental_setups/experiment_{}/plausible_patches".format(last_exp + 1))
+    exp_name = "{}experiment_{}".format(model_prefix, last_exp + 1)
+    print("Creating experiment folder:", exp_name)
+    expl.write("{}\n".format(exp_name))
+    os.mkdir("experimental_setups/{}".format(exp_name))
+    os.mkdir("experimental_setups/{}/logs".format(exp_name))
+    os.mkdir("experimental_setups/{}/responses".format(exp_name))
+    os.mkdir("experimental_setups/{}/external_fixes".format(exp_name))
+    os.mkdir("experimental_setups/{}/saved_contexts".format(exp_name))
+    os.mkdir("experimental_setups/{}/mutations_history".format(exp_name))
+    os.mkdir("experimental_setups/{}/plausible_patches".format(exp_name))

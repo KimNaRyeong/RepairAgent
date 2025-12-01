@@ -53,7 +53,7 @@ class ModelInfo:
 
     name: str
     max_tokens: int
-    prompt_token_cost: float
+    token_cost_per_1m: float
 
 
 @dataclass
@@ -66,7 +66,6 @@ class CompletionModelInfo(ModelInfo):
 @dataclass
 class ChatModelInfo(CompletionModelInfo):
     """Struct for chat model information."""
-
     supports_functions: bool = False
 
 
@@ -139,13 +138,18 @@ class ChatSequence:
         messages: list[Message] | ChatSequence = [],
         **kwargs,
     ) -> TChatSequence:
-        from autogpt.llm.providers.openai import OPEN_AI_CHAT_MODELS
+        from autogpt.llm.providers.openai import OPEN_AI_CHAT_MODELS, TOGETHER_AI_CHAT_MODELS
 
-        if not model_name in OPEN_AI_CHAT_MODELS:
+        # Check in OpenAI models first, then TogetherAI models
+        if model_name in OPEN_AI_CHAT_MODELS:
+            model_info = OPEN_AI_CHAT_MODELS[model_name]
+        elif model_name in TOGETHER_AI_CHAT_MODELS:
+            model_info = TOGETHER_AI_CHAT_MODELS[model_name]
+        else:
             raise ValueError(f"Unknown chat model '{model_name}'")
 
         return cls(
-            model=OPEN_AI_CHAT_MODELS[model_name], messages=list(messages), **kwargs
+            model=model_info, messages=list(messages), **kwargs
         )
 
     @property

@@ -34,8 +34,12 @@ import click
 )
 @click.option("--speak", is_flag=True, help="Enable Speak Mode")
 @click.option("--debug", is_flag=True, help="Enable Debug Mode")
-@click.option("--gpt3only", is_flag=True, help="Enable GPT3.5 Only Mode")
-@click.option("--gpt4only", is_flag=True, help="Enable GPT4 Only Mode")
+@click.option(
+    "--model",
+    type=str,
+    default=True,
+    help="LLM model name to use (e.g. 'llama3', 'qwen2.5', 'gpt-oss')"
+)
 @click.option(
     "--use-memory",
     "-m",
@@ -103,8 +107,7 @@ def main(
     skip_reprompt: bool,
     speak: bool,
     debug: bool,
-    gpt3only: bool,
-    gpt4only: bool,
+    model: str,
     memory_type: str,
     browser_name: str,
     allow_downloads: bool,
@@ -133,8 +136,7 @@ def main(
             skip_reprompt=skip_reprompt,
             speak=speak,
             debug=debug,
-            gpt3only=gpt3only,
-            gpt4only=gpt4only,
+            model=model,
             memory_type=memory_type,
             browser_name=browser_name,
             allow_downloads=allow_downloads,

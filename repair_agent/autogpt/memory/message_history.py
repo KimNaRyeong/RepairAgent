@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 from autogpt.json_utils.utilities import extract_dict_from_response
 from autogpt.llm.base import ChatSequence, Message
-from autogpt.llm.providers.openai import OPEN_AI_CHAT_MODELS
+from autogpt.llm.providers.openai import TOGETHER_AI_CHAT_MODELS, OPEN_AI_CHAT_MODELS
 from autogpt.llm.utils import (
     count_message_tokens,
     count_string_tokens,
@@ -180,7 +180,13 @@ Latest Development:
             elif event.role == "user":
                 new_events.remove(event)
 
-        summ_model = OPEN_AI_CHAT_MODELS[config.fast_llm]
+        # Check both OpenAI and TogetherAI model dictionaries
+        if config.fast_llm in TOGETHER_AI_CHAT_MODELS:
+            summ_model = TOGETHER_AI_CHAT_MODELS[config.fast_llm]
+        elif config.fast_llm in OPEN_AI_CHAT_MODELS:
+            summ_model = OPEN_AI_CHAT_MODELS[config.fast_llm]
+        else:
+            raise KeyError(f"Model {config.fast_llm} not found in OPEN_AI_CHAT_MODELS or TOGETHER_AI_CHAT_MODELS")
 
         # Determine token lengths for use in batching
         prompt_template_length = len(

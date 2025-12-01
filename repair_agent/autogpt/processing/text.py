@@ -7,7 +7,7 @@ import tiktoken
 
 from autogpt.config import Config
 from autogpt.llm.base import ChatSequence
-from autogpt.llm.providers.openai import OPEN_AI_MODELS
+from autogpt.llm.providers.openai import TOGETHER_AI_MODELS, OPEN_AI_MODELS
 from autogpt.llm.utils import count_string_tokens, create_chat_completion
 from autogpt.logs import logger
 
@@ -22,7 +22,13 @@ def batch(iterable, max_batch_length: int, overlap: int = 0):
 
 
 def _max_chunk_length(model: str, max: Optional[int] = None) -> int:
-    model_max_input_tokens = OPEN_AI_MODELS[model].max_tokens - 1
+    # Check both OpenAI and TogetherAI model dictionaries
+    if model in TOGETHER_AI_MODELS:
+        model_max_input_tokens = TOGETHER_AI_MODELS[model].max_tokens - 1
+    elif model in OPEN_AI_MODELS:
+        model_max_input_tokens = OPEN_AI_MODELS[model].max_tokens - 1
+    else:
+        model_max_input_tokens = 4000  # fallback default
     if max is not None and max > 0:
         return min(max, model_max_input_tokens)
     return model_max_input_tokens

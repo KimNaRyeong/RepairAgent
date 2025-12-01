@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from autogpt.models.command_registry import CommandRegistry
 
 from autogpt.llm.base import ChatModelResponse, ChatSequence, Message
-from autogpt.llm.providers.openai import OPEN_AI_CHAT_MODELS, get_openai_command_specs
+from autogpt.llm.providers.openai import TOGETHER_AI_CHAT_MODELS, OPEN_AI_CHAT_MODELS, get_openai_command_specs
 from autogpt.llm.utils import count_message_tokens, create_chat_completion
 from autogpt.logs import logger
 from autogpt.memory.message_history import MessageHistory
@@ -103,7 +103,13 @@ class BaseAgent(metaclass=ABCMeta):
         """
 
         llm_name = self.config.smart_llm if self.big_brain else self.config.fast_llm
-        self.llm = OPEN_AI_CHAT_MODELS[llm_name]
+        # Check both OpenAI and TogetherAI model dictionaries
+        if llm_name in TOGETHER_AI_CHAT_MODELS:
+            self.llm = TOGETHER_AI_CHAT_MODELS[llm_name]
+        elif llm_name in OPEN_AI_CHAT_MODELS:
+            self.llm = OPEN_AI_CHAT_MODELS[llm_name]
+        else:
+            raise KeyError(f"Model {llm_name} not found in OPEN_AI_CHAT_MODELS or TOGETHER_AI_CHAT_MODELS")
         """The LLM that the agent uses to think."""
 
         self.send_token_limit = send_token_limit or self.llm.max_tokens * 3 / 4
@@ -189,7 +195,7 @@ class BaseAgent(metaclass=ABCMeta):
         self.auto_complete = True
         self. generated_methods= None
         self.dummy_fix = False
-        with open("experimental_setups/experiments_list.txt") as eht:
+        with open(self.config.experiments_list_file) as eht:
             self.exps = eht.read().splitlines()
 
     def save_context(self,):
