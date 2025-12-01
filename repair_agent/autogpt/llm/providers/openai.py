@@ -89,6 +89,12 @@ TOGETHER_AI_CHAT_MODELS = {
             token_cost_per_1m=0.15,  # $0.15 per 1M tokens (prompt cost)
             completion_token_cost=0.60,  # $0.60 per 1M tokens
             max_tokens=8192,
+        ),
+        ChatModelInfo(
+            name="Qwen/Qwen3-235B-A22B-Instruct-2507-tput",
+            token_cost_per_1m=0.2,  # $0.20 per 1M tokens (prompt cost)
+            completion_token_cost=0.6,  # $0.60 per 1M tokens
+            max_tokens=32768,
         )
     ]
 }
@@ -101,6 +107,8 @@ chat_model_mapping = {
     "llama3-70b": "meta-llama/Meta-Llama-3-70B-Instruct-Turbo",
     "gpt-oss": "openai/gpt-oss-120b",
     "gpt-oss-120b": "openai/gpt-oss-120b",
+    "qwen3": "Qwen/Qwen3-235B-A22B-Instruct-2507-tput",
+    "qwen3-235b": "Qwen/Qwen3-235B-A22B-Instruct-2507-tput",
 }
 for alias, target in chat_model_mapping.items():
     alias_info = ChatModelInfo(**TOGETHER_AI_CHAT_MODELS[target].__dict__)
