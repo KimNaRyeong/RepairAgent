@@ -9,11 +9,15 @@ RepairAgent is an autonomous LLM-based agent designed for automated program repa
 Before you start using RepairAgent, ensure that your system meets the following requirements:
 
 - **Docker**: Version 20.04 or higher. For installation instructions, see the [Docker documentation](https://docs.docker.com/get-docker).
-- **OpenAI Token and Credits**:
-  - Create an account on the OpenAI website and purchase credits to use the API.
-  - Generate an API token on the same website.
+- **LLM API Access** (choose one or both):
+  - **OpenAI Token and Credits**:
+    - Create an account on the OpenAI website and purchase credits to use the API.
+    - Generate an API token on the same website.
+  - **TogetherAI Token and Credits** (Alternative/Additional):
+    - Create an account on [TogetherAI](https://together.ai) and add credits.
+    - Generate an API token for serverless model access.
 - **Disk Space**: At least 40GB of available disk space on your machine.
-- **Internet Access**: Required while running RepairAgent to connect to OpenAI's API.
+- **Internet Access**: Required while running RepairAgent to connect to LLM APIs.
 
 ---
 
@@ -45,26 +49,55 @@ docker start -i apr-agent
 - Attach the container to a new window by clicking the '+' sign to the right of the container name, then navigate to the `workdir` folder in the VS Code window (**the workdir is `/app/AutoGPT`**).
 - **Tutorial Reference**: For detailed steps on attaching a Docker container in VS Code, check out this [video tutorial (1min 38 sec)](https://www.youtube.com/watch?v=8gUtN5j4QnY&t).
 
-### **STEP 3: Set the OpenAI API Key**
+### **STEP 3: Set the API Key**
 
-RepairAgent relies on OpenAI's LLMs (like GPT-3.5). To configure it, obtain your OpenAI API key and execute the following command within the Docker container:
+RepairAgent supports multiple LLM providers. Configure your API key based on your chosen provider:
+
+#### **Option A: OpenAI (GPT models)**
 
 ```bash
 python3.10 set_api_key.py
 ```
 
-The script will prompt you to paste your API token.
+The script will prompt you to paste your OpenAI API token.
+
+#### **Option B: TogetherAI (Llama, GPT-OSS models)**
+
+Edit the `.env` file in the `repair_agent` directory:
+
+```bash
+USE_TOGETHER_AI=True
+TOGETHER_AI_API_KEY=your_together_ai_api_key_here
+```
+
+You can also use both providers simultaneously - the system will automatically route requests to the correct API based on the model name.
 
 ### **STEP 4: Start RepairAgent**
 
-By default, RepairAgent is configured to run on Defects4J bugs. 
+By default, RepairAgent is configured to run on Defects4J bugs.
 
 - To specify which bugs to run on, create a text file named, for example, `bugs_list`. A sample file exists in the repository and Docker image at the location `experimental_setups/bugs_list`.
-  
+
 Once created, execute the following command:
 
+#### **Using default model (llama3:8b):**
 ```bash
 ./run_on_defects4j.sh experimental_setups/bugs_list hyperparameters.json
+```
+
+#### **Specifying a model:**
+```bash
+# TogetherAI models
+./run_on_defects4j.sh experimental_setups/bugs_list hyperparameters.json llama3:70b
+./run_on_defects4j.sh experimental_setups/bugs_list hyperparameters.json gpt-oss-120b
+
+# OpenAI models
+./run_on_defects4j.sh experimental_setups/bugs_list hyperparameters.json gpt-3.5-turbo-0125
+```
+
+#### **Using custom experiment list file:**
+```bash
+./run_on_defects4j.sh experimental_setups/bugs_list hyperparameters.json llama3:70b experimental_setups/experiments_list_llama3.txt
 ```
 
 You can open the `hyperparameters.json` file to check its parameters (explained more in the customization section).
@@ -138,7 +171,26 @@ Within the `experimental_setups` folder, several scripts are available to post-p
   "external_fix_strategy": 0,
   ```
 
-### 2. Switch Between GPT-3.5 and GPT-4
+### 2. Multi-Provider Mode: Supported Models
+
+This version of RepairAgent now supports multiple LLM providers through a unified interface:
+
+#### **Supported Models:**
+
+**TogetherAI Models:**
+- `llama3` or `llama3:8b` - Meta Llama 3.1 8B Instruct Turbo ($0.18/1M tokens)
+- `llama3:70b` - Meta Llama 3 70B Instruct Turbo ($0.88/1M tokens)
+- `gpt-oss-120b` - OpenAI GPT-OSS 120B ($0.15/1M prompt, $0.60/1M completion)
+
+**OpenAI Models:**
+- `gpt-3.5-turbo-0125` - GPT-3.5 Turbo ($0.50/1M prompt, $1.50/1M completion)
+- `gpt-4-0314` - GPT-4 ($30/1M prompt, $60/1M completion)
+
+#### **Model Selection:**
+
+Specify the model as the third argument to `run_on_defects4j.sh`
+
+### 3. Switch Between GPT-3.5 and GPT-4
 
 In the `run_on_defects4j.sh` file, locate the line:
 ```bash
@@ -147,7 +199,7 @@ In the `run_on_defects4j.sh` file, locate the line:
 - The `--gpt3only` flag enforces GPT-3.5 usage. Removing this flag switches RepairAgent to GPT-4.
 - Search the codebase for "gpt-3" and "gpt-4" to update version names accordingly.
 
-### 3. Run RepairAgent on an Arbitrary Project
+### 4. Run RepairAgent on an Arbitrary Project
 
 Documentation for this feature is forthcoming in version 0.7.0. We are working on simplifying this process into a single command for ease of use.
 

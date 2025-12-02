@@ -131,7 +131,7 @@ def main():
     # with open('experiments_list.txt', 'r') as experiments_list_file:
     #     experiment_folders = experiments_list_file.read().splitlines()
     # experiment_folders = ['experiment_1', 'experiment_2', 'experiment_3', 'experiment_4', 'experiment_5', 'experiment_6', 'experiment_7', 'experiment_8', 'experiment_9', 'experiment_10']
-    experiment_folders = ['llama3_70b_experiment_1']
+    experiment_folders = ['experiment_1']
 
     total_correctly_fixed_bugs = 0
     total_suggested_fixes = 0
@@ -139,6 +139,7 @@ def main():
     for experiment_folder in experiment_folders:
         num_log_files, table, correctly_fixed_bugs, suggested_fixes, total_queries, all_suggested_fixes, csv_data = analyze_experiment(experiment_folder)
         save_to_csv(experiment_folder, csv_data)
+
 
         #print(f"Experiment: {experiment_folder}")
         #print(f"Number of log files: {num_log_files}")
@@ -159,8 +160,8 @@ def main():
         # print(table)
 
 
-    print(f"Total Correctly Fixed Bugs Across Experiments: {total_correctly_fixed_bugs}")
-    print(f"Grand Total Suggested Fixes Across Experiments: {total_suggested_fixes}")
+    print(f"Total Correctly Fixed Bugs Across Experiments: {correctly_fixed_bugs}")
+    print(f"Grand Total Suggested Fixes Across Experiments: {suggested_fixes}")
 
 if __name__ == "__main__":
     main()
