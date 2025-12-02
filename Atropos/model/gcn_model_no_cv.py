@@ -445,44 +445,44 @@ def main(dir_dict, hidden_dim, num_layer, balanced):
     num_pos = len(pos_data)
     num_neg = len(neg_data)
     
-    if balanced:
-        if num_neg < num_pos:
-            raise ValueError(f"The number of data with label 1 is bigger than the data with label 0")
+    # if balanced:
+    #     if num_neg < num_pos:
+    #         raise ValueError(f"The number of data with label 1 is bigger than the data with label 0")
 
-        sampled_neg_data = random.sample(neg_data, num_pos)
-        reference_dataset = pos_data + sampled_neg_data
-        random.shuffle(reference_dataset)
-        num_neg = num_pos
+    #     sampled_neg_data = random.sample(neg_data, num_pos)
+    #     reference_dataset = pos_data + sampled_neg_data
+    #     random.shuffle(reference_dataset)
+    #     num_neg = num_pos
 
-    all_bug_names = [data.bug_name for data in reference_dataset]
+    # all_bug_names = [data.bug_name for data in reference_dataset]
 
-    train_bug_names, test_bug_names = train_test_split(all_bug_names, test_size=0.2, random_state=42, shuffle=True)
+    # train_bug_names, test_bug_names = train_test_split(all_bug_names, test_size=0.2, random_state=42, shuffle=True)
 
-    print(f"Total bugs: {len(all_bug_names)}")
-    print(f"Positive: {num_pos}")
-    print(f"Negative: {num_neg}")
-
-    if balanced:
-        with open('../balanced_train_bugs.txt', 'w') as f:
-            f.write('\n'.join(train_bug_names))
-        with open('../balanced_test_bugs.txt', 'w') as f:
-            f.write('\n'.join(test_bug_names))
-    else:
-        with open('../train_bugs.txt', 'w') as f:
-            f.write('\n'.join(train_bug_names))
-        with open('../test_bugs.txt', 'w') as f:
-            f.write('\n'.join(test_bug_names))
+    # print(f"Total bugs: {len(all_bug_names)}")
+    # print(f"Positive: {num_pos}")
+    # print(f"Negative: {num_neg}")
 
     # if balanced:
-    #     with open('../balanced_train_bugs.txt', 'r') as f:
-    #         train_bug_names = f.read().splitlines()
-    #     with open('../balanced_test_bugs.txt', 'r') as f:
-    #         test_bug_names = f.read().splitlines()
+    #     with open('../balanced_train_bugs.txt', 'w') as f:
+    #         f.write('\n'.join(train_bug_names))
+    #     with open('../balanced_test_bugs.txt', 'w') as f:
+    #         f.write('\n'.join(test_bug_names))
     # else:
-    #     with open('../train_bugs.txt', 'r') as f:
-    #         train_bug_names = f.read().splitlines()
-    #     with open('../test_bugs.txt', 'r') as f:
-    #         test_bug_names = f.read().splitlines()
+    #     with open('../train_bugs.txt', 'w') as f:
+    #         f.write('\n'.join(train_bug_names))
+    #     with open('../test_bugs.txt', 'w') as f:
+    #         f.write('\n'.join(test_bug_names))
+
+    if balanced:
+        with open('../balanced_train_bugs.txt', 'r') as f:
+            train_bug_names = f.read().splitlines()
+        with open('../balanced_test_bugs.txt', 'r') as f:
+            test_bug_names = f.read().splitlines()
+    else:
+        with open('../train_bugs.txt', 'r') as f:
+            train_bug_names = f.read().splitlines()
+        with open('../test_bugs.txt', 'r') as f:
+            test_bug_names = f.read().splitlines()
 
     dataset_FA = {}
     for k in ks:
