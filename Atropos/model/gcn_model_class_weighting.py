@@ -273,7 +273,7 @@ def evaluate_with_specificity(model, loader, device):
     
     return specificity
 
-def train_and_test_model(dataset, criterion, output_dim, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, dataset_name, result_dir):
+def train_and_test_model(dataset, criterion, output_dim, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, dataset_name, dir_dict):
     print(f"Training and testing with {dataset_name}")
     with open(result_file, "a+") as rf:
         rf.write(f"{dataset_name.split('_')[-1]}\n")
@@ -320,8 +320,7 @@ def train_and_test_model(dataset, criterion, output_dim, lr, batch_size, hidden_
         best_epoch = 0
 
         # Model save path
-        parsed_dir = result_dir.split('/')
-        model_dir = os.path.join('../results/saved_models', '/'.join(parsed_dir[2:]))
+        model_dir = dir_dict['trained_model_dir']
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
         model_path = os.path.join(model_dir, f"{k}k_best_model.pt")
@@ -376,7 +375,7 @@ def train_and_test_model(dataset, criterion, output_dim, lr, batch_size, hidden_
         best_specificity = specificities[best_epoch]
 
         # Plot accuracy graphs over epochs
-        graph_dir = os.path.join('../results/training_graphs', '/'.join(parsed_dir[2:]))
+        graph_dir = dir_dict['graph_dir']
         if not os.path.exists(graph_dir):
             os.makedirs(graph_dir)
 
@@ -394,7 +393,7 @@ def train_and_test_model(dataset, criterion, output_dim, lr, batch_size, hidden_
 
         roc_auc_graph_path = os.path.join(graph_dir, f"{k}k_roc_auc.png")
         plt.figure(figsize=(4.5, 4))
-        plt.plot(best_fpr, best_tpr, label=f'ROC Curve (AUC = {best_roc:.4f})', color='blue', linewidth=2)
+        plt.plot(best_fpr, best_tpr, label=f'ROC Curve (AUC = {best_auc:.4f})', color='blue', linewidth=2)
         plt.plot([0, 1], [0, 1], linestyle='--', color='red', linewidth=1.5, label='Random Guess')
         plt.xlabel('False Positive Rate (FPR)', fontsize=14)
         plt.ylabel('True Positive Rate (TPR)', fontsize=14)
@@ -415,7 +414,7 @@ def train_and_test_model(dataset, criterion, output_dim, lr, batch_size, hidden_
         print(f"Best specificity: {best_specificity:.4f}")
         print('-------------------------------------------------------------------')
         with open(result_file, "a+") as rf:
-            rf.write(f"Epoch = {best_epoch+1}")
+            rf.write(f"Epoch = {best_epoch+1}\n")
             rf.write(f"Best train accuracy: {best_train_acc:.4f}\n")
             rf.write(f"Best test accuracy: {best_test_acc:.4f}\n")
             rf.write(f"Best AUC: {best_auc:.4f}\n")
@@ -430,39 +429,20 @@ def train_and_test_model(dataset, criterion, output_dim, lr, batch_size, hidden_
 
 
 
-def main(dataset_dir, hidden_dim, num_layer, balanced):
+def main(dir_dict, hidden_dim, num_layer):
     set_seed(42)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    directory = '/'.join(dataset_dir.split('/')[2:])
-    # print(directory)
-    result_dir = os.path.join('../results', directory, f'{hidden_dim}h_{num_layer}l')
+    dataset_dir = dir_dict['data_dir']
+    result_dir = dir_dict['result_dir']
 
-    if balanced:
-        result_dir = os.path.join(result_dir, 'balanced')
     ks = [int(k) for k in os.listdir(dataset_dir)]
     # ks = [100]
 
     dataset_FA = {}
     for k in ks:
-        if balanced:
-            dataset_for_k = torch.load(os.path.join(dataset_dir, str(k), "gcn_dataset.pt"), weights_only = False)
-            
-            pos_data = [d for d in dataset_for_k if int(d.y.item()) == 1]
-            neg_data = [d for d in dataset_for_k if int(d.y.item()) == 0]
-
-            num_pos = len(pos_data)
-            num_neg = len(neg_data)
-
-            if num_neg < num_pos:
-                raise ValueError(f"The number of data with label 1 is bigger than the data with label 0")
-            
-            sampled_neg_data = random.sample(neg_data, num_pos)
-            dataset_FA[k] = pos_data + sampled_neg_data
-            random.shuffle(dataset_FA[k])
-        else:
-            dataset_FA[k] = torch.load(os.path.join(dataset_dir, str(k), "gcn_dataset.pt"), weights_only = False)
+        dataset_FA[k] = torch.load(os.path.join(dataset_dir, str(k), "gcn_dataset.pt"), weights_only = False)
 
     if not os.path.exists(result_dir):
         os.makedirs(result_dir)
@@ -485,20 +465,34 @@ def main(dataset_dir, hidden_dim, num_layer, balanced):
     num_layer = num_layer
     num_epochs = 100
 
-    train_and_test_model(dataset_FA, criterion, output_dim, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, "dataset_FA", result_dir)
+    train_and_test_model(dataset_FA, criterion, output_dim, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, "dataset_FA", dir_dict)
+
+def get_dir_dict(dataset_dir, hidden_dim, num_layer):
+    dir_dict = dict()
+
+    parsed_dir = dataset_dir.split('/')
+    result_dir = os.path.join('../results', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/class_weighting")
+    trained_model_dir = os.path.join('../trained_model', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/class_weighting")
+    graph_dir = os.path.join('../graphs', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/class_weighting")
 
 
+    dir_dict = {
+        'data_dir': dataset_dir,
+        'result_dir': result_dir,
+        'trained_model_dir': trained_model_dir,
+        'graph_dir': graph_dir
+    }
+
+    return dir_dict
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--dataset_dir', default='../data/clustering/fasttext/sentence_vector/100/processed_response/0.96_0.97/label_criteria_5') # should be modified
+    parser.add_argument('-d', '--dataset_dir', default='../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_1')
     parser.add_argument('--hidden_dim', default=64, type=int)
     parser.add_argument('-l', '--num_layer', default=3, type=int)
-    parser.add_argument('-b', '--balanced', default=0, type=int)
     args = parser.parse_args()
 
-    balanced = True if args.balanced == 1 else False
-
-    main(args.dataset_dir, args.hidden_dim, args.num_layer, balanced)
+    dir_dict = get_dir_dict(args.dataset_dir, args.hidden_dim, args.num_layer)
+    main(dir_dict, args.hidden_dim, args.num_layer)
     
