@@ -35,10 +35,11 @@ def print_metadata(dataset, ks, dataset_name):
         print(f".   x shape: {dataset[k][0].x.shape}")
 
 
-def get_baseline_acc(dataset, result_file):
-    num_total = len(dataset[5])
+def get_baseline_acc(dataset, bug_list, result_file):
+    dataset_in_bug_list = [d for d in dataset[5] if d.bug_name in bug_list]
+    num_total = len(dataset_in_bug_list)
     num_true = 0
-    for data in dataset[5]:
+    for data in dataset_in_bug_list:
         if data.y:
             num_true += 1
     baseline_acc = num_true / num_total
@@ -273,37 +274,36 @@ def evaluate_with_specificity(model, loader, device):
     
     return specificity
 
-def train_and_test_model(dataset, criterion, output_dim, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, dataset_name, dir_dict):
+def train_and_test_model(dataset, train_bug_names, test_bug_names, criterion, output_dim, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, dataset_name, dir_dict):
     print(f"Training and testing with {dataset_name}")
     with open(result_file, "a+") as rf:
         rf.write(f"{dataset_name.split('_')[-1]}\n")
     
+    get_baseline_acc(dataset, test_bug_names, result_file)
+
     for k in sorted(ks):
         with open(result_file, "a+") as rf:
             rf.write(f'k={k}\n')
         print(f"==================For {k}=======================")
-        
+
         input_dim = dataset[k][0].x.shape[1]
 
-        # Split dataset into train/test (8:2)
-        indices = list(range(len(dataset[k])))
-        train_idx, test_idx = train_test_split(indices,  test_size=0.2, random_state=42, shuffle=True)
+        train_dataset = [d for d in dataset[k] if d.bug_name in train_bug_names]
+        test_dataset = [d for d in dataset[k] if d.bug_name in test_bug_names]
 
-        train_dataset = [dataset[k][i] for i in train_idx]
-        test_dataset = [dataset[k][i] for i in test_idx]
         train_loader = DataLoader(train_dataset, batch_size = batch_size, shuffle=True)
         test_loader = DataLoader(test_dataset, batch_size = batch_size, shuffle = False)
 
-        # Calculate class weights for imbalanced dataset
-        train_labels = [int(dataset[k][i].y.item()) for i in train_idx]
-        num_pos = sum(train_labels)
-        num_neg = len(train_labels) - num_pos
-        pos_weight = torch.tensor([num_neg / num_pos], device=device) if num_pos > 0 else torch.tensor([1.0], device=device)
+        # Print class distribution
+        train_labels = [int(d.y.item()) for d in train_dataset]
+        train_num_pos = sum(train_labels)
+        train_num_neg = len(train_labels) - train_num_pos
+        print(f"Class distribution in train dataset - Positive: {train_num_pos}, Negative: {train_num_neg}")
 
-        print(f"Class distribution - Positive: {num_pos}, Negative: {num_neg}, Pos weight: {pos_weight.item():.4f}")
-
-        # Update criterion with class weight
-        weighted_criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        test_labels = [int(d.y.item()) for d in test_dataset]
+        test_num_pos = sum(test_labels)
+        test_num_neg = len(test_labels) - test_num_pos
+        print(f"Class distribution in test dataset - Positive: {test_num_pos}, Negative: {test_num_neg}")
 
         # Initialize model
         model = GCN(input_dim, hidden_dim, output_dim, dropout_p, num_layer).to(device)
@@ -327,7 +327,7 @@ def train_and_test_model(dataset, criterion, output_dim, lr, batch_size, hidden_
 
         # Training_loop
         for epoch in range(num_epochs):
-            loss, train_acc = train(model, optimizer, weighted_criterion, train_loader, device)
+            loss, train_acc = train(model, optimizer, criterion, train_loader, device)
             test_acc = test(model, test_loader, device)
             fpr, tpr, auc_score = test_with_auc(model, test_loader, device)
             precision = evaluate_with_fixed_threshold_precision(model, test_loader, device)
@@ -365,6 +365,7 @@ def train_and_test_model(dataset, criterion, output_dim, lr, batch_size, hidden_
         print(f"Best model saved to {model_path}")
 
         # Use metrics from best epoch
+        best_train_acc = train_accs[best_epoch]
         best_test_acc = test_accs[best_epoch]
         best_fpr = fprs[best_epoch]
         best_tpr = tprs[best_epoch]
@@ -422,14 +423,9 @@ def train_and_test_model(dataset, criterion, output_dim, lr, batch_size, hidden_
             rf.write(f"Best recall: {best_recall:.4f}\n")
             rf.write(f"Best npv: {best_npv:.4f}\n")
             rf.write(f"Best specificity: {best_specificity:.4f}\n")
-            
-    
-    
 
 
-
-
-def main(dir_dict, hidden_dim, num_layer):
+def main(dir_dict, hidden_dim, num_layer, balanced):
     set_seed(42)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -440,42 +436,93 @@ def main(dir_dict, hidden_dim, num_layer):
     ks = [int(k) for k in os.listdir(dataset_dir)]
     # ks = [100]
 
+    smallest_k = min(ks)
+    reference_dataset = torch.load(os.path.join(dataset_dir, str(smallest_k), "gcn_dataset.pt"), weights_only = False)
+
+    pos_data = [d for d in reference_dataset if int(d.y.item()) == 1]
+    neg_data = [d for d in reference_dataset if int(d.y.item()) == 0]
+
+    num_pos = len(pos_data)
+    num_neg = len(neg_data)
+    
+    if balanced:
+        if num_neg < num_pos:
+            raise ValueError(f"The number of data with label 1 is bigger than the data with label 0")
+
+        sampled_neg_data = random.sample(neg_data, num_pos)
+        reference_dataset = pos_data + sampled_neg_data
+        random.shuffle(reference_dataset)
+        num_neg = num_pos
+
+    all_bug_names = [data.bug_name for data in reference_dataset]
+
+    train_bug_names, test_bug_names = train_test_split(all_bug_names, test_size=0.2, random_state=42, shuffle=True)
+
+    print(f"Total bugs: {len(all_bug_names)}")
+    print(f"Positive: {num_pos}")
+    print(f"Negative: {num_neg}")
+
+    if balanced:
+        with open('../balanced_train_bugs.txt', 'w') as f:
+            f.write('\n'.join(train_bug_names))
+        with open('../balanced_test_bugs.txt', 'w') as f:
+            f.write('\n'.join(test_bug_names))
+    else:
+        with open('../train_bugs.txt', 'w') as f:
+            f.write('\n'.join(train_bug_names))
+        with open('../test_bugs.txt', 'w') as f:
+            f.write('\n'.join(test_bug_names))
+
+    # if balanced:
+    #     with open('../balanced_train_bugs.txt', 'r') as f:
+    #         train_bug_names = f.read().splitlines()
+    #     with open('../balanced_test_bugs.txt', 'r') as f:
+    #         test_bug_names = f.read().splitlines()
+    # else:
+    #     with open('../train_bugs.txt', 'r') as f:
+    #         train_bug_names = f.read().splitlines()
+    #     with open('../test_bugs.txt', 'r') as f:
+    #         test_bug_names = f.read().splitlines()
+
     dataset_FA = {}
     for k in ks:
-        dataset_FA[k] = torch.load(os.path.join(dataset_dir, str(k), "gcn_dataset.pt"), weights_only = False)
+        dataset_for_k = torch.load(os.path.join(dataset_dir, str(k), "gcn_dataset.pt"), weights_only = False)
+        dataset_FA[k] = dataset_for_k
 
-    print(dataset_FA[k][0].keys())
-    # if not os.path.exists(result_dir):
-    #     os.makedirs(result_dir)
+    if not os.path.exists(result_dir):
+        os.makedirs(result_dir)
 
-    # result_file = os.path.join(result_dir, f"gcn_result.txt")
+    result_file = os.path.join(result_dir, f"gcn_result.txt")
 
-    # if os.path.exists(result_file):
-    #     os.remove(result_file)
-    #     print(f"{result_file} is removed")
-    
-    # get_baseline_acc(dataset_FA, result_file)
+    if os.path.exists(result_file):
+        os.remove(result_file)
+        print(f"{result_file} is removed")
+
     # print_metadata(dataset_FA, ks, "dataset_FA")
 
-    # criterion = nn.BCEWithLogitsLoss()
-    # output_dim = 1
-    # lr = 0.001
-    # batch_size = 32
-    # hidden_dim = hidden_dim
-    # dropout_p = 0.8
-    # num_layer = num_layer
-    # num_epochs = 100
+    criterion = nn.BCEWithLogitsLoss()
+    output_dim = 1
+    lr = 0.001
+    batch_size = 32
+    hidden_dim = hidden_dim
+    dropout_p = 0.8
+    num_layer = num_layer
+    num_epochs = 100
 
-    # train_and_test_model(dataset_FA, criterion, output_dim, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, "dataset_FA", dir_dict)
+    train_and_test_model(dataset_FA, train_bug_names, test_bug_names, criterion, output_dim, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, "dataset_FA", dir_dict)
 
-def get_dir_dict(dataset_dir, hidden_dim, num_layer):
+def get_dir_dict(dataset_dir, hidden_dim, num_layer, balanced):
     dir_dict = dict()
 
     parsed_dir = dataset_dir.split('/')
-    result_dir = os.path.join('../results', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/class_weighting")
-    trained_model_dir = os.path.join('../trained_model', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/class_weighting")
-    graph_dir = os.path.join('../graphs', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/class_weighting")
-
+    if balanced:
+        result_dir = os.path.join('../results', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/no_cv/balanced")
+        trained_model_dir = os.path.join('../trained_model', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/no_cv/balanced")
+        graph_dir = os.path.join('../graphs', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/no_cv/balanced")
+    else:
+        result_dir = os.path.join('../results', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/no_cv")
+        trained_model_dir = os.path.join('../trained_model', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/no_cv")
+        graph_dir = os.path.join('../graphs', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/no_cv")
 
     dir_dict = {
         'data_dir': dataset_dir,
@@ -492,8 +539,11 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--dataset_dir', default='../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_1')
     parser.add_argument('--hidden_dim', default=64, type=int)
     parser.add_argument('-l', '--num_layer', default=3, type=int)
+    parser.add_argument('-b', '--balanced', default=0, type=int)
     args = parser.parse_args()
 
-    dir_dict = get_dir_dict(args.dataset_dir, args.hidden_dim, args.num_layer)
-    main(dir_dict, args.hidden_dim, args.num_layer)
+    balanced = True if args.balanced == 1 else False
+
+    dir_dict = get_dir_dict(args.dataset_dir, args.hidden_dim, args.num_layer, balanced)
+    main(dir_dict, args.hidden_dim, args.num_layer, balanced)
     

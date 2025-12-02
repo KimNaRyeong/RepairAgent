@@ -1,32 +1,9 @@
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_1 --hidden_dim 64 -l 2 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_2 --hidden_dim 64 -l 2 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_3 --hidden_dim 64 -l 2 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_4 --hidden_dim 64 -l 2 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_5 --hidden_dim 64 -l 2 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_6 --hidden_dim 64 -l 2 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_7 --hidden_dim 64 -l 2 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_8 --hidden_dim 64 -l 2 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_9 --hidden_dim 64 -l 2 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_10 --hidden_dim 64 -l 2 -b 1
-
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_1 --hidden_dim 64 -l 3 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_2 --hidden_dim 64 -l 3 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_3 --hidden_dim 64 -l 3 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_4 --hidden_dim 64 -l 3 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_5 --hidden_dim 64 -l 3 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_6 --hidden_dim 64 -l 3 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_7 --hidden_dim 64 -l 3 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_8 --hidden_dim 64 -l 3 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_9 --hidden_dim 64 -l 3 -b 1
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_10 --hidden_dim 64 -l 3 -b 1
-
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_1 --hidden_dim 64 -l 3 -b 0
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_2 --hidden_dim 64 -l 3 -b 0
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_3 --hidden_dim 64 -l 3 -b 0
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_4 --hidden_dim 64 -l 3 -b 0
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_5 --hidden_dim 64 -l 3 -b 0
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_6 --hidden_dim 64 -l 3 -b 0
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_7 --hidden_dim 64 -l 3 -b 0
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_8 --hidden_dim 64 -l 3 -b 0
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_9 --hidden_dim 64 -l 3 -b 0
-python gcn_model.py -d ../data/only_action/40/processed_response/plausible_patch/label_criteria_10 --hidden_dim 64 -l 3 -b 0
+python gcn_model_class_weighting.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_2 -b 0
+python gcn_model_class_weighting.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_3 -b 0
+python gcn_model_class_weighting.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_4 -b 0
+python gcn_model_class_weighting.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_5 -b 0
+python gcn_model_class_weighting.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_6 -b 0
+python gcn_model_class_weighting.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_7 -b 0
+python gcn_model_class_weighting.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_8 -b 0
+python gcn_model_class_weighting.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_9 -b 0
+python gcn_model_class_weighting.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_10 -b 0
