@@ -298,12 +298,17 @@ def train_and_test_model(dataset, train_bug_names, test_bug_names, criterion, ou
         train_labels = [int(d.y.item()) for d in train_dataset]
         train_num_pos = sum(train_labels)
         train_num_neg = len(train_labels) - train_num_pos
-        print(f"Class distribution in train dataset - Positive: {train_num_pos}, Negative: {train_num_neg}")
 
         test_labels = [int(d.y.item()) for d in test_dataset]
         test_num_pos = sum(test_labels)
         test_num_neg = len(test_labels) - test_num_pos
+
+        print(f"Class distribution in train dataset - Positive: {train_num_pos}, Negative: {train_num_neg}")
         print(f"Class distribution in test dataset - Positive: {test_num_pos}, Negative: {test_num_neg}")
+
+        with open(result_file, 'a+') as f:
+            f.write(f"Class distribution in train dataset - Positive: {train_num_pos}, Negative: {train_num_neg}")
+            f.write(f"Class distribution in test dataset - Positive: {test_num_pos}, Negative: {test_num_neg}")
 
         # Initialize model
         model = GCN(input_dim, hidden_dim, output_dim, dropout_p, num_layer).to(device)
@@ -436,53 +441,57 @@ def main(dir_dict, hidden_dim, num_layer, balanced):
     ks = [int(k) for k in os.listdir(dataset_dir)]
     # ks = [100]
 
-    smallest_k = min(ks)
-    reference_dataset = torch.load(os.path.join(dataset_dir, str(smallest_k), "gcn_dataset.pt"), weights_only = False)
-
-    pos_data = [d for d in reference_dataset if int(d.y.item()) == 1]
-    neg_data = [d for d in reference_dataset if int(d.y.item()) == 0]
-
-    num_pos = len(pos_data)
-    num_neg = len(neg_data)
-    
-    # if balanced:
-    #     if num_neg < num_pos:
-    #         raise ValueError(f"The number of data with label 1 is bigger than the data with label 0")
-
-    #     sampled_neg_data = random.sample(neg_data, num_pos)
-    #     reference_dataset = pos_data + sampled_neg_data
-    #     random.shuffle(reference_dataset)
-    #     num_neg = num_pos
-
-    # all_bug_names = [data.bug_name for data in reference_dataset]
-
-    # train_bug_names, test_bug_names = train_test_split(all_bug_names, test_size=0.2, random_state=42, shuffle=True)
-
-    # print(f"Total bugs: {len(all_bug_names)}")
-    # print(f"Positive: {num_pos}")
-    # print(f"Negative: {num_neg}")
-
-    # if balanced:
-    #     with open('../balanced_train_bugs.txt', 'w') as f:
-    #         f.write('\n'.join(train_bug_names))
-    #     with open('../balanced_test_bugs.txt', 'w') as f:
-    #         f.write('\n'.join(test_bug_names))
-    # else:
-    #     with open('../train_bugs.txt', 'w') as f:
-    #         f.write('\n'.join(train_bug_names))
-    #     with open('../test_bugs.txt', 'w') as f:
-    #         f.write('\n'.join(test_bug_names))
+    label_criteria = dir_dict['data_dir'].split('/')[-1]
 
     if balanced:
-        with open('../balanced_train_bugs.txt', 'r') as f:
-            train_bug_names = f.read().splitlines()
-        with open('../balanced_test_bugs.txt', 'r') as f:
-            test_bug_names = f.read().splitlines()
+        train_bug_list_file = f'../bug_list/balanced_train_bugs_{label_criteria}.txt'
+        test_bug_list_file = f'../bug_list/balanced_test_bugs_{label_criteria}.txt'
     else:
-        with open('../train_bugs.txt', 'r') as f:
+        train_bug_list_file = f'../bug_list/train_bugs_{label_criteria}.txt'
+        test_bug_list_file = f'../bug_list/test_bugs_{label_criteria}.txt'
+    
+    if os.path.exists(train_bug_list_file) and os.path.exists(test_bug_list_file):
+        with open(train_bug_list_file, 'r') as f:
             train_bug_names = f.read().splitlines()
-        with open('../test_bugs.txt', 'r') as f:
+        with open(test_bug_list_file, 'r') as f:
             test_bug_names = f.read().splitlines()
+        all_bug_names = train_bug_names + test_bug_names
+    
+    else:
+        smallest_k = min(ks)
+        reference_dataset = torch.load(os.path.join(dataset_dir, str(smallest_k), "gcn_dataset.pt"), weights_only = False)
+
+        pos_data = [d for d in reference_dataset if int(d.y.item()) == 1]
+        neg_data = [d for d in reference_dataset if int(d.y.item()) == 0]
+
+        num_pos = len(pos_data)
+        num_neg = len(neg_data)
+    
+        if balanced:
+            if num_neg < num_pos:
+                raise ValueError(f"The number of data with label 1 is bigger than the data with label 0")
+
+            sampled_neg_data = random.sample(neg_data, num_pos)
+            reference_dataset = pos_data + sampled_neg_data
+            random.shuffle(reference_dataset)
+            num_neg = num_pos
+
+        all_bug_names = [data.bug_name for data in reference_dataset]
+
+        train_bug_names, test_bug_names = train_test_split(all_bug_names, test_size=0.2, random_state=42, shuffle=True)
+
+        if balanced:
+            with open(f'../bug_list/balanced_train_bugs_{label_criteria}.txt', 'w') as f:
+                f.write('\n'.join(train_bug_names))
+            with open(f'../bug_list/balanced_test_bugs_{label_criteria}.txt', 'w') as f:
+                f.write('\n'.join(test_bug_names))
+        else:
+            with open(f'../bug_list/train_bugs_{label_criteria}.txt', 'w') as f:
+                f.write('\n'.join(train_bug_names))
+            with open(f'../bug_list/test_bugs_{label_criteria}.txt', 'w') as f:
+                f.write('\n'.join(test_bug_names))
+
+    print(f"Total bugs: {len(all_bug_names)}")
 
     dataset_FA = {}
     for k in ks:
@@ -497,6 +506,8 @@ def main(dir_dict, hidden_dim, num_layer, balanced):
     if os.path.exists(result_file):
         os.remove(result_file)
         print(f"{result_file} is removed")
+    with open(result_file, 'a+') as f:
+        f.write(f"Total bugs: {len(all_bug_names)}\n")
 
     # print_metadata(dataset_FA, ks, "dataset_FA")
 

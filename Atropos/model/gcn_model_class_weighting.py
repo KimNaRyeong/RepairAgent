@@ -365,6 +365,7 @@ def train_and_test_model(dataset, criterion, output_dim, lr, batch_size, hidden_
         print(f"Best model saved to {model_path}")
 
         # Use metrics from best epoch
+        best_train_acc = train_accs[best_epoch]
         best_test_acc = test_accs[best_epoch]
         best_fpr = fprs[best_epoch]
         best_tpr = tprs[best_epoch]

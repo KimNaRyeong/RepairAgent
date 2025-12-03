@@ -1,4 +1,3 @@
-python gcn_model_no_cv.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_1 -b 1
 python gcn_model_no_cv.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_2 -b 1
 python gcn_model_no_cv.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_3 -b 1
 python gcn_model_no_cv.py -d ../data/clustering/fasttext/word_vector/100/processed_response/0.99_0.99/plausible_patch/label_criteria_4 -b 1
