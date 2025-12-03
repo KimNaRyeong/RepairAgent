@@ -1,6 +1,7 @@
 import torch.nn as nn
 import os
 import torch
+import json
 import numpy as np
 import argparse
 import matplotlib.pyplot as plt
@@ -126,15 +127,39 @@ def test_with_auc(model, loader, device):
                 out = out.view(-1)
 
             preds = torch.sigmoid(out).cpu().numpy()
-            
+
             labels = data.y.cpu().numpy()
 
             all_preds.extend(preds)
             all_labels.extend(labels)
-    
+
     fpr, tpr, thresholds = roc_curve(all_labels, all_preds)
     auc = roc_auc_score(all_labels, all_preds)
     return fpr, tpr, auc
+
+def test_with_predictions(model, loader, device):
+    """Test and return predictions for each bug"""
+    model.eval()
+    bug_predictions = []
+
+    with torch.no_grad():
+        for data in loader:
+            data = data.to(device)
+            out = model(data)
+            if out.dim() == 2 and out.size(1) == 1:
+                out = out.view(-1)
+
+            pred = (torch.sigmoid(out) >= 0.5).int()
+
+            # Handle batch: iterate through each sample in the batch
+            for i in range(len(data.y)):
+                bug_predictions.append({
+                    'bug_name': data.bug_name[i],
+                    'prediction': int(pred[i].item()),
+                    'label': int(data.y[i].item())
+                })
+
+    return bug_predictions
 
 def evaluate_with_fixed_threshold_precision(model, loader, device):
     threshold=0.5
@@ -274,11 +299,11 @@ def evaluate_with_specificity(model, loader, device):
     
     return specificity
 
-def train_and_test_model(dataset, train_bug_names, test_bug_names, criterion, output_dim, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, dataset_name, dir_dict):
+def train_and_test_model(dataset, train_bug_names, val_bug_names, test_bug_names, criterion, output_dim, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, dataset_name, dir_dict):
     print(f"Training and testing with {dataset_name}")
     with open(result_file, "a+") as rf:
         rf.write(f"{dataset_name.split('_')[-1]}\n")
-    
+
     get_baseline_acc(dataset, test_bug_names, result_file)
 
     for k in sorted(ks):
@@ -289,9 +314,11 @@ def train_and_test_model(dataset, train_bug_names, test_bug_names, criterion, ou
         input_dim = dataset[k][0].x.shape[1]
 
         train_dataset = [d for d in dataset[k] if d.bug_name in train_bug_names]
+        val_dataset = [d for d in dataset[k] if d.bug_name in val_bug_names]
         test_dataset = [d for d in dataset[k] if d.bug_name in test_bug_names]
 
         train_loader = DataLoader(train_dataset, batch_size = batch_size, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size = batch_size, shuffle = False)
         test_loader = DataLoader(test_dataset, batch_size = batch_size, shuffle = False)
 
         # Print class distribution
@@ -299,28 +326,34 @@ def train_and_test_model(dataset, train_bug_names, test_bug_names, criterion, ou
         train_num_pos = sum(train_labels)
         train_num_neg = len(train_labels) - train_num_pos
 
+        val_labels = [int(d.y.item()) for d in val_dataset]
+        val_num_pos = sum(val_labels)
+        val_num_neg = len(val_labels) - val_num_pos
+
         test_labels = [int(d.y.item()) for d in test_dataset]
         test_num_pos = sum(test_labels)
         test_num_neg = len(test_labels) - test_num_pos
 
         print(f"Class distribution in train dataset - Positive: {train_num_pos}, Negative: {train_num_neg}")
+        print(f"Class distribution in val dataset - Positive: {val_num_pos}, Negative: {val_num_neg}")
         print(f"Class distribution in test dataset - Positive: {test_num_pos}, Negative: {test_num_neg}")
 
         with open(result_file, 'a+') as f:
-            f.write(f"Class distribution in train dataset - Positive: {train_num_pos}, Negative: {train_num_neg}")
-            f.write(f"Class distribution in test dataset - Positive: {test_num_pos}, Negative: {test_num_neg}")
+            f.write(f"Class distribution in train dataset - Positive: {train_num_pos}, Negative: {train_num_neg}\n")
+            f.write(f"Class distribution in val dataset - Positive: {val_num_pos}, Negative: {val_num_neg}\n")
+            f.write(f"Class distribution in test dataset - Positive: {test_num_pos}, Negative: {test_num_neg}\n")
 
         # Initialize model
         model = GCN(input_dim, hidden_dim, output_dim, dropout_p, num_layer).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr = lr)
 
         # Track metrics
-        train_accs, test_accs = [], []
+        train_accs, val_accs, test_accs = [], [], []
         precisions, recalls, npvs, specificities = [], [], [], []
         fprs, tprs, aucs_list = [], [], []
 
-        # For saving best model
-        best_test_acc = 0.0
+        # For saving best model based on validation accuracy
+        best_val_acc = 0.0
         best_model_state = None
         best_epoch = 0
 
@@ -333,6 +366,7 @@ def train_and_test_model(dataset, train_bug_names, test_bug_names, criterion, ou
         # Training_loop
         for epoch in range(num_epochs):
             loss, train_acc = train(model, optimizer, criterion, train_loader, device)
+            val_acc = test(model, val_loader, device)
             test_acc = test(model, test_loader, device)
             fpr, tpr, auc_score = test_with_auc(model, test_loader, device)
             precision = evaluate_with_fixed_threshold_precision(model, test_loader, device)
@@ -341,6 +375,7 @@ def train_and_test_model(dataset, train_bug_names, test_bug_names, criterion, ou
             specificity = evaluate_with_specificity(model, test_loader, device)
 
             train_accs.append(train_acc)
+            val_accs.append(val_acc)
             test_accs.append(test_acc)
             precisions.append(precision)
             recalls.append(recall)
@@ -350,17 +385,18 @@ def train_and_test_model(dataset, train_bug_names, test_bug_names, criterion, ou
             tprs.append(tpr)
             aucs_list.append(auc_score)
 
-            if test_acc > best_test_acc:
-                best_test_acc = test_acc
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
                 best_epoch = epoch
                 best_model_state = model.state_dict().copy()
-        
+
         # Save the best model
         torch.save({
             'epoch': best_epoch,
             'model_state_dict': best_model_state,
             'train_acc': train_accs[best_epoch],
-            'test_acc': best_test_acc,
+            'val_acc': best_val_acc,
+            'test_acc': test_accs[best_epoch],
             'input_dim': input_dim,
             'hidden_dim': hidden_dim,
             'output_dim': output_dim,
@@ -369,8 +405,23 @@ def train_and_test_model(dataset, train_bug_names, test_bug_names, criterion, ou
         }, model_path)
         print(f"Best model saved to {model_path}")
 
-        # Use metrics from best epoch
+        # Load best model and get test predictions
+        model.load_state_dict(best_model_state)
+        test_predictions = test_with_predictions(model, test_loader, device)
+
+        # Save test predictions to file
+        prediction_dir = dir_dict['prediction_dir']
+        if not os.path.exists(prediction_dir):
+            os.makedirs(prediction_dir)
+        prediction_file = os.path.join(prediction_dir, f"{k}k_test_predictions.json")
+
+        with open(prediction_file, 'w') as pf:
+            json.dump(test_predictions, pf, indent=4)
+        print(f"Test predictions saved to {prediction_file}")
+
+        # Use metrics from best epoch (based on validation accuracy)
         best_train_acc = train_accs[best_epoch]
+        best_val_acc = val_accs[best_epoch]
         best_test_acc = test_accs[best_epoch]
         best_fpr = fprs[best_epoch]
         best_tpr = tprs[best_epoch]
@@ -388,6 +439,7 @@ def train_and_test_model(dataset, train_bug_names, test_bug_names, criterion, ou
         acc_graph_path = os.path.join(graph_dir, f"{k}k_acc.png")
         plt.figure(figsize=(10, 6))
         plt.plot(range(1, num_epochs + 1), train_accs, label='Train Accuracy')
+        plt.plot(range(1, num_epochs + 1), val_accs, label='Validation Accuracy')
         plt.plot(range(1, num_epochs + 1), test_accs, label='Test Accuracy')
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
@@ -409,9 +461,10 @@ def train_and_test_model(dataset, train_bug_names, test_bug_names, criterion, ou
         plt.tight_layout()
         plt.savefig(roc_auc_graph_path)
         plt.close()
-        
+
         print(f"Epoch = {best_epoch+1}")
         print(f"Best train accuracy: {best_train_acc:.4f}")
+        print(f"Best val accuracy: {best_val_acc:.4f}")
         print(f"Best test accuracy: {best_test_acc:.4f}")
         print(f"Best AUC: {best_auc:.4f}")
         print(f"Best precision: {best_precision:.4f}")
@@ -422,6 +475,7 @@ def train_and_test_model(dataset, train_bug_names, test_bug_names, criterion, ou
         with open(result_file, "a+") as rf:
             rf.write(f"Epoch = {best_epoch+1}\n")
             rf.write(f"Best train accuracy: {best_train_acc:.4f}\n")
+            rf.write(f"Best val accuracy: {best_val_acc:.4f}\n")
             rf.write(f"Best test accuracy: {best_test_acc:.4f}\n")
             rf.write(f"Best AUC: {best_auc:.4f}\n")
             rf.write(f"Best precision: {best_precision:.4f}\n")
@@ -443,20 +497,29 @@ def main(dir_dict, hidden_dim, num_layer, balanced):
 
     label_criteria = dir_dict['data_dir'].split('/')[-1]
 
+    # Create bug_list_val directory if not exists
+    bug_list_val_dir = '../bug_list_val'
+    if not os.path.exists(bug_list_val_dir):
+        os.makedirs(bug_list_val_dir)
+
     if balanced:
-        train_bug_list_file = f'../bug_list/balanced_train_bugs_{label_criteria}.txt'
-        test_bug_list_file = f'../bug_list/balanced_test_bugs_{label_criteria}.txt'
+        train_bug_list_file = os.path.join(bug_list_val_dir, f'balanced_train_bugs_{label_criteria}.txt')
+        val_bug_list_file = os.path.join(bug_list_val_dir, f'balanced_val_bugs_{label_criteria}.txt')
+        test_bug_list_file = os.path.join(bug_list_val_dir, f'balanced_test_bugs_{label_criteria}.txt')
     else:
-        train_bug_list_file = f'../bug_list/train_bugs_{label_criteria}.txt'
-        test_bug_list_file = f'../bug_list/test_bugs_{label_criteria}.txt'
-    
-    if os.path.exists(train_bug_list_file) and os.path.exists(test_bug_list_file):
+        train_bug_list_file = os.path.join(bug_list_val_dir, f'train_bugs_{label_criteria}.txt')
+        val_bug_list_file = os.path.join(bug_list_val_dir, f'val_bugs_{label_criteria}.txt')
+        test_bug_list_file = os.path.join(bug_list_val_dir, f'test_bugs_{label_criteria}.txt')
+
+    if os.path.exists(train_bug_list_file) and os.path.exists(val_bug_list_file) and os.path.exists(test_bug_list_file):
         with open(train_bug_list_file, 'r') as f:
             train_bug_names = f.read().splitlines()
+        with open(val_bug_list_file, 'r') as f:
+            val_bug_names = f.read().splitlines()
         with open(test_bug_list_file, 'r') as f:
             test_bug_names = f.read().splitlines()
-        all_bug_names = train_bug_names + test_bug_names
-    
+        all_bug_names = train_bug_names + val_bug_names + test_bug_names
+
     else:
         smallest_k = min(ks)
         reference_dataset = torch.load(os.path.join(dataset_dir, str(smallest_k), "gcn_dataset.pt"), weights_only = False)
@@ -466,7 +529,7 @@ def main(dir_dict, hidden_dim, num_layer, balanced):
 
         num_pos = len(pos_data)
         num_neg = len(neg_data)
-    
+
         if balanced:
             if num_neg < num_pos:
                 raise ValueError(f"The number of data with label 1 is bigger than the data with label 0")
@@ -478,20 +541,24 @@ def main(dir_dict, hidden_dim, num_layer, balanced):
 
         all_bug_names = [data.bug_name for data in reference_dataset]
 
-        train_bug_names, test_bug_names = train_test_split(all_bug_names, test_size=0.2, random_state=42, shuffle=True)
+        # Split: 0.8 train, 0.1 val, 0.1 test
+        train_bug_names, temp_bug_names = train_test_split(all_bug_names, test_size=0.2, random_state=42, shuffle=True)
+        val_bug_names, test_bug_names = train_test_split(temp_bug_names, test_size=0.5, random_state=42, shuffle=True)
 
-        if balanced:
-            with open(f'../bug_list/balanced_train_bugs_{label_criteria}.txt', 'w') as f:
-                f.write('\n'.join(train_bug_names))
-            with open(f'../bug_list/balanced_test_bugs_{label_criteria}.txt', 'w') as f:
-                f.write('\n'.join(test_bug_names))
-        else:
-            with open(f'../bug_list/train_bugs_{label_criteria}.txt', 'w') as f:
-                f.write('\n'.join(train_bug_names))
-            with open(f'../bug_list/test_bugs_{label_criteria}.txt', 'w') as f:
-                f.write('\n'.join(test_bug_names))
+        # Save bug lists to bug_list_val directory
+        with open(train_bug_list_file, 'w') as f:
+            f.write('\n'.join(train_bug_names))
+        with open(val_bug_list_file, 'w') as f:
+            f.write('\n'.join(val_bug_names))
+        with open(test_bug_list_file, 'w') as f:
+            f.write('\n'.join(test_bug_names))
+
+        print(f"Bug lists saved to {bug_list_val_dir}")
 
     print(f"Total bugs: {len(all_bug_names)}")
+    print(f"Train bugs: {len(train_bug_names)}")
+    print(f"Val bugs: {len(val_bug_names)}")
+    print(f"Test bugs: {len(test_bug_names)}")
 
     dataset_FA = {}
     for k in ks:
@@ -508,6 +575,9 @@ def main(dir_dict, hidden_dim, num_layer, balanced):
         print(f"{result_file} is removed")
     with open(result_file, 'a+') as f:
         f.write(f"Total bugs: {len(all_bug_names)}\n")
+        f.write(f"Train bugs: {len(train_bug_names)}\n")
+        f.write(f"Val bugs: {len(val_bug_names)}\n")
+        f.write(f"Test bugs: {len(test_bug_names)}\n")
 
     # print_metadata(dataset_FA, ks, "dataset_FA")
 
@@ -520,26 +590,29 @@ def main(dir_dict, hidden_dim, num_layer, balanced):
     num_layer = num_layer
     num_epochs = 100
 
-    train_and_test_model(dataset_FA, train_bug_names, test_bug_names, criterion, output_dim, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, "dataset_FA", dir_dict)
+    train_and_test_model(dataset_FA, train_bug_names, val_bug_names, test_bug_names, criterion, output_dim, lr, batch_size, hidden_dim, dropout_p, num_layer, num_epochs, ks, result_file, device, "dataset_FA", dir_dict)
 
 def get_dir_dict(dataset_dir, hidden_dim, num_layer, balanced):
     dir_dict = dict()
 
     parsed_dir = dataset_dir.split('/')
     if balanced:
-        result_dir = os.path.join('../results', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/no_cv/balanced")
-        trained_model_dir = os.path.join('../trained_model', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/no_cv/balanced")
-        graph_dir = os.path.join('../graphs', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/no_cv/balanced")
+        result_dir = os.path.join('../results', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/val/balanced")
+        trained_model_dir = os.path.join('../trained_model', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/val/balanced")
+        graph_dir = os.path.join('../graphs', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/val/balanced")
+        prediction_dir = os.path.join('../predictions', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/val/balanced")
     else:
-        result_dir = os.path.join('../results', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/no_cv")
-        trained_model_dir = os.path.join('../trained_model', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/no_cv")
-        graph_dir = os.path.join('../graphs', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/no_cv")
+        result_dir = os.path.join('../results', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/val")
+        trained_model_dir = os.path.join('../trained_model', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/val")
+        graph_dir = os.path.join('../graphs', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/val")
+        prediction_dir = os.path.join('../predictions', '/'.join(parsed_dir[2:]), f"{hidden_dim}h_{num_layer}l/val")
 
     dir_dict = {
         'data_dir': dataset_dir,
         'result_dir': result_dir,
         'trained_model_dir': trained_model_dir,
-        'graph_dir': graph_dir
+        'graph_dir': graph_dir,
+        'prediction_dir': prediction_dir
     }
 
     return dir_dict
