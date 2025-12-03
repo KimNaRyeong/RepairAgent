@@ -64,6 +64,20 @@ OPEN_AI_CHAT_MODELS = {
             completion_token_cost=1.5,
             max_tokens=16000,
             supports_functions=True,
+        ),
+        ChatModelInfo(
+            name="gpt-4o",
+            token_cost_per_1m=2.5,  # prompt cost
+            completion_token_cost=10.0,
+            max_tokens=128000,
+            supports_functions=True,
+        ),
+        ChatModelInfo(
+            name="gpt-4o-mini",
+            token_cost_per_1m=0.15,  # prompt cost
+            completion_token_cost=0.6,
+            max_tokens=128000,
+            supports_functions=True,
         )
 
     ]
@@ -99,8 +113,8 @@ TOGETHER_AI_CHAT_MODELS = {
     ]
 }
 
-# Set aliases for rolling model IDs
-chat_model_mapping = {
+# Set aliases for rolling model IDs (TogetherAI)
+together_ai_chat_model_mapping = {
     "llama3": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
     "llama3:8b": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
     "llama3:70b": "meta-llama/Meta-Llama-3-70B-Instruct-Turbo",
@@ -110,10 +124,23 @@ chat_model_mapping = {
     "qwen3": "Qwen/Qwen3-235B-A22B-Instruct-2507-tput",
     "qwen3-235b": "Qwen/Qwen3-235B-A22B-Instruct-2507-tput",
 }
-for alias, target in chat_model_mapping.items():
+for alias, target in together_ai_chat_model_mapping.items():
     alias_info = ChatModelInfo(**TOGETHER_AI_CHAT_MODELS[target].__dict__)
     alias_info.name = alias
     TOGETHER_AI_CHAT_MODELS[alias] = alias_info
+
+# Set aliases for OpenAI models
+openai_chat_model_mapping = {
+    "gpt-4o": "gpt-4o",
+    "gpt-4o-mini": "gpt-4o-mini",
+    "gpt-3.5-turbo": "gpt-3.5-turbo-0125",
+    "gpt-4": "gpt-4-0314",
+}
+for alias, target in openai_chat_model_mapping.items():
+    if target in OPEN_AI_CHAT_MODELS and alias != target:
+        alias_info = ChatModelInfo(**OPEN_AI_CHAT_MODELS[target].__dict__)
+        alias_info.name = alias
+        OPEN_AI_CHAT_MODELS[alias] = alias_info
 
 # OPEN_AI_TEXT_MODELS = {
 #     info.name: info

@@ -42,6 +42,11 @@ def count_message_tokens(
         )
         tokens_per_name = -1  # if there's a name, the role is omitted
         encoding_model = "gpt-3.5-turbo"
+    elif model.startswith("gpt-4o"):
+        # GPT-4o models use the same tokenization as GPT-4
+        tokens_per_message = 3
+        tokens_per_name = 1
+        encoding_model = "gpt-4o"
     elif model.startswith("gpt-4"):
         tokens_per_message = 3
         tokens_per_name = 1

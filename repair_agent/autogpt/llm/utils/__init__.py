@@ -146,8 +146,17 @@ def create_chat_completion(
         "model": model,
         "temperature": temperature,
         "max_tokens": max_tokens,
-        "response_format": { "type": "json_object" }
     }
+
+    # Only add response_format for models that support it
+    # GPT-4o and newer models may handle JSON differently
+    if model in OPEN_AI_CHAT_MODELS:
+        # For now, skip response_format for gpt-4o models to avoid compatibility issues
+        if not model.startswith("gpt-4o"):
+            chat_completion_kwargs["response_format"] = { "type": "json_object" }
+    elif model in TOGETHER_AI_CHAT_MODELS:
+        # TogetherAI models may not support response_format
+        pass
 
     for plugin in config.plugins:
         if plugin.can_handle_chat_completion(

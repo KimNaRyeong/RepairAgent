@@ -102,6 +102,18 @@ def create_config(
         config.fast_llm = model_name
         config.smart_llm = model_name
         logger.typewriter_log("OpenAI Mode: ", Fore.CYAN, "ENABLED")
+    elif model == 'gpt-4o':
+        model_name = "gpt-4o"
+        logger.typewriter_log("LLM MODEL: ", Fore.GREEN, model_name)
+        config.fast_llm = model_name
+        config.smart_llm = model_name
+        logger.typewriter_log("OpenAI Mode: ", Fore.CYAN, "ENABLED")
+    elif model == 'gpt-4o-mini':
+        model_name = "gpt-4o-mini"
+        logger.typewriter_log("LLM MODEL: ", Fore.GREEN, model_name)
+        config.fast_llm = model_name
+        config.smart_llm = model_name
+        logger.typewriter_log("OpenAI Mode: ", Fore.CYAN, "ENABLED")
     elif model == 'qwen3' or model == 'qwen3-235b':
         model_name = "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"
         logger.typewriter_log("LLM MODEL: ", Fore.GREEN, model_name)
