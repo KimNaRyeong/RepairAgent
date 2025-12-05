@@ -131,7 +131,7 @@ def main():
     # with open('experiments_list.txt', 'r') as experiments_list_file:
     #     experiment_folders = experiments_list_file.read().splitlines()
     # experiment_folders = ['experiment_1', 'experiment_2', 'experiment_3', 'experiment_4', 'experiment_5', 'experiment_6', 'experiment_7', 'experiment_8', 'experiment_9', 'experiment_10']
-    experiment_folders = ['experiment_1']
+    experiment_folders = ['gpt-4o_experiment_1']
 
     total_correctly_fixed_bugs = 0
     total_suggested_fixes = 0
