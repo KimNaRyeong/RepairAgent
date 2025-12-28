@@ -40,7 +40,6 @@ def data_load(data_dir):
 
 def print_metadata(dataset, ks, dataset_name):
     print(f"About {dataset_name}")
-    print(dataset)
     print(f"Data size: {len(dataset[5])}")
 
     for k in sorted(ks):
@@ -362,30 +361,30 @@ def train_and_test_model(dataset, criterion, output_dim, K, kf, lr, batch_size, 
             test_auprs.append(test_metrics['aupr'])
             test_fpr_at_95s.append(test_metrics['fpr_at_95'])
 
-        confidence_result_file = os.path.join(dir_dict['result'], 'autofl_confidence_result.json')
-        if not os.path.exists(confidence_result_file):
-            all_confidence_threshold_accs = {
-                'val': val_all_confidence_threshold_accs,
-                'test': test_all_confidence_threshold_accs
-            }
-            with open(confidence_result_file, 'w') as f:
-                json.dump(all_confidence_threshold_accs, f, indent=4)
+        # confidence_result_file = os.path.join(dir_dict['result'], 'autofl_confidence_result.json')
+        # if not os.path.exists(confidence_result_file):
+            # all_confidence_threshold_accs = {
+                # 'val': val_all_confidence_threshold_accs,
+                # 'test': test_all_confidence_threshold_accs
+            # }
+            # with open(confidence_result_file, 'w') as f:
+                # json.dump(all_confidence_threshold_accs, f, indent=4)
 
         # Calculate mean baseline and confidence metrics
         mean_baseline_acc = np.mean(test_baseline_accs)
-        mean_confidence_auc = np.mean(test_confidence_aucs)
-        mean_confidence_aupr = np.mean(test_confidence_auprs)
-        mean_confidence_fpr_at_95 = np.mean(test_confidence_fpr_at_95)
+        # mean_confidence_auc = np.mean(test_confidence_aucs)
+        # mean_confidence_aupr = np.mean(test_confidence_auprs)
+        # mean_confidence_fpr_at_95 = np.mean(test_confidence_fpr_at_95)
 
         # Find best threshold across all folds (the one with highest average accuracy) from validation set
-        thresholds = sorted(val_all_confidence_threshold_accs[0].keys())
-        val_avg_threshold_accs = {}
-        for th in thresholds:
-            val_avg_threshold_accs[th] = np.mean([fold_th_accs[th] for fold_th_accs in val_all_confidence_threshold_accs])
+        # thresholds = sorted(val_all_confidence_threshold_accs[0].keys())
+        # val_avg_threshold_accs = {}
+        # for th in thresholds:
+            # val_avg_threshold_accs[th] = np.mean([fold_th_accs[th] for fold_th_accs in val_all_confidence_threshold_accs])
 
-        best_conf_threshold = max(val_avg_threshold_accs, key=val_avg_threshold_accs.get)
-        val_best_mean_conf_acc = val_avg_threshold_accs[best_conf_threshold]
-        test_mean_conf_acc = np.mean([fold_th_accs[best_conf_threshold] for fold_th_accs in test_all_confidence_threshold_accs])
+        # best_conf_threshold = max(val_avg_threshold_accs, key=val_avg_threshold_accs.get)
+        # val_best_mean_conf_acc = val_avg_threshold_accs[best_conf_threshold]
+        # test_mean_conf_acc = np.mean([fold_th_accs[best_conf_threshold] for fold_th_accs in test_all_confidence_threshold_accs])
 
         mean_test_acc = np.mean(test_accs)
         mean_test_auc = np.mean(test_aucs)
@@ -432,11 +431,11 @@ def train_and_test_model(dataset, criterion, output_dim, K, kf, lr, batch_size, 
 
         print(f"Best Epoch = {best_val_epoch}")
         print(f"Baseline Accuracy: {mean_baseline_acc:.4f}")
-        print(f"Confidence AUC: {mean_confidence_auc:.4f}")
-        print(f"Confidence AUPR: {mean_confidence_aupr:.4f}")
-        print(f"Confidence FPR@95: {mean_confidence_fpr_at_95:.4f}")
-        print(f"Confidence Accuracy: {test_mean_conf_acc:.4f}")
-        print(f"Confidence Accuracy (Best Threshold={best_conf_threshold}): {test_mean_conf_acc:.4f}")
+        # print(f"Confidence AUC: {mean_confidence_auc:.4f}")
+        # print(f"Confidence AUPR: {mean_confidence_aupr:.4f}")
+        # print(f"Confidence FPR@95: {mean_confidence_fpr_at_95:.4f}")
+        # print(f"Confidence Accuracy: {test_mean_conf_acc:.4f}")
+        # print(f"Confidence Accuracy (Best Threshold={best_conf_threshold}): {test_mean_conf_acc:.4f}")
         print(f"Test Accuracy: {mean_test_acc:.4f}")
         print(f"Test ROC-AUC: {mean_test_auc:.4f}")
         print(f"Test AUPR: {mean_test_aupr:.4f}")
@@ -450,10 +449,10 @@ def train_and_test_model(dataset, criterion, output_dim, K, kf, lr, batch_size, 
         with open(result_file, "a+") as rf:
             rf.write(f"Best Epoch = {best_val_epoch}\n")
             rf.write(f"Baseline Accuracy (Test): {mean_baseline_acc:.4f}\n")
-            rf.write(f"Confidence AUC (Test): {mean_confidence_auc:.4f}\n")
-            rf.write(f"Confidence AUPR (Test): {mean_confidence_aupr:.4f}\n")
-            rf.write(f"Confidence FPR@95 (Test): {mean_confidence_fpr_at_95:.4f}\n")
-            rf.write(f"Confidence Accuracy (Best Threshold={best_conf_threshold}): {test_mean_conf_acc:.4f}\n")
+            # rf.write(f"Confidence AUC (Test): {mean_confidence_auc:.4f}\n")
+            # rf.write(f"Confidence AUPR (Test): {mean_confidence_aupr:.4f}\n")
+            # rf.write(f"Confidence FPR@95 (Test): {mean_confidence_fpr_at_95:.4f}\n")
+            # rf.write(f"Confidence Accuracy (Best Threshold={best_conf_threshold}): {test_mean_conf_acc:.4f}\n")
             rf.write(f"Test Accuracy: {mean_test_acc:.4f}\n")
             rf.write(f"Test ROC-AUC: {mean_test_auc:.4f}\n")
             rf.write(f"Test AUPR: {mean_test_aupr:.4f}\n")
@@ -484,6 +483,19 @@ def main(dir_dict):
 
     data_dir = dir_dict['data']
     dataset = data_load(data_dir)
+
+    # --- [디버깅 코드 시작] ---
+    print("Checking for malformed data labels...")
+    for k, data_list in dataset.items():
+        for i, data in enumerate(data_list):
+            # y가 스칼라(1개)가 아닌 경우를 찾음
+            if data.y.numel() != 1:
+                print(f"!!! Found malformed data at k={k}, index={i}")
+                print(f"    Shape of y: {data.y.shape}")
+                print(f"    Value of y: {data.y}")
+                # 필요하다면 여기서 강제로 수정 (예: 첫 번째 값만 사용)
+                # data.y = data.y[0].unsqueeze(0) 
+    # --- [디버깅 코드 끝] ---
 
     result_dir = dir_dict['result']
     if not os.path.exists(result_dir):
@@ -516,10 +528,10 @@ def main(dir_dict):
 
 def get_dir_dict(label_criteria, threshold, merge_threshold):    
     dir_dict = {
-        'data': f'../data/parallel/nhot_normal/center_vector/{threshold}_{merge_threshold}/label_criteria_{label_criteria}',
-        'result': f'../results/parallel/nhot_normal/center_vector/{threshold}_{merge_threshold}/label_criteria_{label_criteria}',
-        'trained_model': f'../trained_model/parallel/nhot_normal/center_vector/{threshold}_{merge_threshold}/label_criteria_{label_criteria}',
-        'train_graph': f'../train_graph/parallel/nhot_normal/center_vector/{threshold}_{merge_threshold}/label_criteria_{label_criteria}'
+        'data': f'../data/parallel/normal/center_vector/{threshold}_{merge_threshold}/label_criteria_{label_criteria}',
+        'result': f'../results/parallel/normal/center_vector/{threshold}_{merge_threshold}/label_criteria_{label_criteria}',
+        'trained_model': f'../trained_model/parallel/normal/center_vector/{threshold}_{merge_threshold}/label_criteria_{label_criteria}',
+        'train_graph': f'../train_graph/parallel/normal/center_vector/{threshold}_{merge_threshold}/label_criteria_{label_criteria}'
     }
 
     return dir_dict

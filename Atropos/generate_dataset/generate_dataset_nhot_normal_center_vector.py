@@ -271,19 +271,26 @@ class Data_generator():
     
     def create_gcn_data_from_graph(self, graph, clusterer, bug_name):
         node_embeddings = []
-        for cluster_idx in graph.nodes():
-            cluster_center = clusterer.cluster_centers[cluster_idx]
-            node_embeddings.append(cluster_center)
-        
+
+        if len(graph.nodes()) == 0:
+            command_vector = np.ones(len(self.command_list)+1, dtype=np.float32)
+            none_embedding = embed_with_fasttext('None')
+            node_embeddings.append(np.concatenate([command_vector, none_embedding]))
+            graph.add_node(0, size=1)
+        else:
+            for cluster_idx in graph.nodes():
+                cluster_center = clusterer.cluster_centers[cluster_idx]
+                node_embeddings.append(cluster_center)
+
         data = from_networkx(graph)
         data.x = torch.tensor(np.array(node_embeddings), dtype = torch.float)
         data.y = torch.tensor([self.labels_dict[bug_name]], dtype=float)
         data.bug_name = bug_name
         data.edge_weight = torch.tensor([graph[u][v]['weight'] for u, v in graph.edges()], dtype=torch.float)
-        
+
         if hasattr(data, 'weight'):
             delattr(data, 'weight')
-        
+
         if hasattr(data, 'size'):
             delattr(data, 'size')
 

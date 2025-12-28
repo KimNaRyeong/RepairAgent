@@ -261,9 +261,14 @@ class Data_generator():
     
     def create_gcn_data_from_graph(self, graph, clusterer, bug_name):
         node_embeddings = []
-        for cluster_idx in graph.nodes():
-            cluster_center = clusterer.cluster_centers[cluster_idx]
-            node_embeddings.append(cluster_center)
+        if len(graph.nodes()) == 0:
+            none_embedding = embed_with_fasttext('None')
+            node_embeddings.append(none_embedding)
+            graph.add_node(0, size=1)
+        else:
+            for cluster_idx in graph.nodes():
+                cluster_center = clusterer.cluster_centers[cluster_idx]
+                node_embeddings.append(cluster_center)
         
         data = from_networkx(graph)
         data.x = torch.tensor(np.array(node_embeddings), dtype = torch.float)
