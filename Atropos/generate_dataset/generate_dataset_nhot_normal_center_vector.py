@@ -273,9 +273,10 @@ class Data_generator():
         node_embeddings = []
 
         if len(graph.nodes()) == 0:
-            command_vector = np.ones(len(self.command_list)+1, dtype=np.float32)
-            none_embedding = embed_with_fasttext('None')
-            node_embeddings.append(np.concatenate([command_vector, none_embedding]))
+            command_vector = np.zeros(len(self.command_list)+1, dtype=np.float32)
+            command_vector[-1] = 1
+            arg_vector = np.zeros(embedding_size, dtype=np.float32)
+            node_embeddings.append(np.concatenate([command_vector, arg_vector]))
             graph.add_node(0, size=1)
         else:
             for cluster_idx in graph.nodes():
