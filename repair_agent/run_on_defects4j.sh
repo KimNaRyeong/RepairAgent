@@ -17,6 +17,12 @@ MODEL_PREFIX="${MODEL_NAME//:/_}"
 # Get experiments list file from fourth argument, default to experimental_setups/experiments_list.txt
 EXPERIMENTS_LIST="${4:-experimental_setups/experiments_list.txt}"
 
+# Get resume-from interaction number from fifth argument (optional)
+RESUME_FROM="${5:-}"
+
+# Get source experiment directory from sixth argument (optional)
+SOURCE_EXPERIMENT="${6:-}"
+
 # Export as environment variable so the agent can use it
 export EXPERIMENTS_LIST_FILE="$EXPERIMENTS_LIST"
 
@@ -36,7 +42,19 @@ do
     echo ${tuple[0]}, ${tuple[1]}
     python3 prepare_ai_settings.py "${tuple[0]}" "${tuple[1]}"
     python3 checkout_py.py "${tuple[0]}" "${tuple[1]}"
-    timeout $timeout_seconds ./run.sh --ai-settings ai_settings.yaml --model "$MODEL_NAME" -c -l 40 -m json_file --experiment-file "$2"
+
+    # Build command with optional --resume-from and --source-experiment arguments
+    CMD="timeout $timeout_seconds ./run.sh --ai-settings ai_settings.yaml --model \"$MODEL_NAME\" -c -l 40 -m json_file --experiment-file \"$2\""
+    if [ -n "$RESUME_FROM" ]; then
+        CMD="$CMD --resume-from $RESUME_FROM"
+        echo "Resuming from interaction $RESUME_FROM"
+    fi
+    if [ -n "$SOURCE_EXPERIMENT" ]; then
+        CMD="$CMD --source-experiment \"$SOURCE_EXPERIMENT\""
+        echo "Loading state from source experiment: $SOURCE_EXPERIMENT"
+    fi
+
+    eval $CMD
 
     if [ $? -eq 124 ]; then
       echo "Timeout on ${tuple[0]} ${tuple[1]}"

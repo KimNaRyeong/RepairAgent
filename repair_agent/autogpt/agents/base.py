@@ -39,9 +39,13 @@ class BaseAgent(metaclass=ABCMeta):
         cycle_budget: Optional[int] = 1,
         send_token_limit: Optional[int] = None,
         summary_max_tlength: Optional[int] = None,
-        experiment_file: str = None
+        experiment_file: str = None,
+        resume_from: Optional[int] = None,
+        source_experiment: Optional[str] = None
     ):
         self.experiment_file = experiment_file
+        self.resume_from = resume_from
+        self.source_experiment = source_experiment
         self.ai_config = ai_config
         """The AIConfig or "personality" object associated with this agent."""
 
@@ -198,6 +202,11 @@ class BaseAgent(metaclass=ABCMeta):
         with open(self.config.experiments_list_file) as eht:
             self.exps = eht.read().splitlines()
 
+        # Load state from existing files if resume_from is specified
+        if self.resume_from is not None:
+            logger.info(f"Resuming from interaction {self.resume_from}...")
+            self.load_state_from_files(self.resume_from)
+
     def save_context(self,):
         return
         context = {
@@ -292,6 +301,125 @@ please use the indicated format and produce a list, like this:
                 self.pre_search += "\nExtracted methods and classes from {} and the result is the following:\n {}".format(args, exec_result)
             if name == "extract_similar_functions_calls":
                 self.pre_similar += "Search query {} found the following similar functions calls:\n{}\n\n".format(str(args), exec_result)
+
+    def _parse_prompt_history(self, prompt_history_file, num_interactions):
+        """Parse prompt history file to extract user messages (command results).
+
+        Returns a list of user messages corresponding to command execution results.
+        """
+        user_messages = []
+
+        if not os.path.exists(prompt_history_file):
+            logger.warn(f"Prompt history file not found: {prompt_history_file}")
+            return []
+
+        with open(prompt_history_file, 'r') as f:
+            content = f.read()
+
+        # Split by ChatSequence markers
+        sequences = content.split('============== ChatSequence ==============')
+
+        for seq_idx, sequence in enumerate(sequences[1:num_interactions+2]):  # Skip first empty part, take only needed interactions
+            # Find the last USER message in this sequence (which contains command result)
+            user_sections = sequence.split('------------------ USER ------------------')
+            if len(user_sections) >= 2:
+                # The last USER section contains the command execution result
+                last_user_message = user_sections[-1].split('------------------')[0].strip()
+                user_messages.append(last_user_message)
+            else:
+                # Fallback: empty message if parsing fails
+                user_messages.append(f"[Restored] Interaction {seq_idx+1} result")
+
+        return user_messages
+
+    def load_state_from_files(self, interaction_num: int):
+        """Load agent state from existing files up to the specified interaction number.
+
+        Args:
+            interaction_num: The interaction number to resume from (e.g., 19 means load up to 19th, start from 20th)
+        """
+        from autogpt.llm.base import Message
+
+        exps = self.exps
+        # Use source_experiment if specified, otherwise use current experiment
+        source_exp = self.source_experiment if self.source_experiment else exps[-1]
+        directory = f"./experimental_setups/{source_exp}"
+
+        logger.info(f"Loading state from experiment directory: {directory}")
+
+        # Parse prompt history to get user messages (command results)
+        prompt_history_file = os.path.join(directory, 'logs', f'prompt_history_{self.project_name}_{self.bug_index}')
+        user_messages = self._parse_prompt_history(prompt_history_file, interaction_num)
+
+        for i in user_messages:
+            print(i)
+            print("===========================")
+
+        # Load model responses up to interaction_num
+        model_responses_file = os.path.join(directory, 'responses', f'model_responses_{self.project_name}_{self.bug_index}.json')
+        if os.path.exists(model_responses_file):
+            with open(model_responses_file, 'r') as f:
+                responses = json.load(f)
+                # Load only up to interaction_num
+                if len(responses) > interaction_num:
+                    responses = responses[:interaction_num]
+                logger.info(f"Loaded {len(responses)} model responses from existing file")
+
+                # Reconstruct history from responses with corresponding user messages
+                for idx, response in enumerate(responses):
+                    response_dict = json.loads(response) if isinstance(response, str) else response
+                    # Add assistant message to history
+                    self.history.add("assistant", json.dumps(response_dict), "action")
+                    # Add corresponding user message (command result) from prompt history
+                    # print(json.dumps(response_dict))
+                    # print("-------------------------------")
+                    if idx < len(user_messages):
+                        self.history.add("user", user_messages[idx+1], "action_result")
+                        # print(user_messages[idx+1])
+                    else:
+                        # Fallback if user message not found
+                        self.history.add("user", f"[Restored] Command {idx+1} executed", "action_result")
+                        print(f"[Restored] Command {idx+1} executed")
+                    print("==============================")
+                
+
+        # Load processed commands up to interaction_num
+        processed_command_file = os.path.join(directory, 'responses', f'processed_command_{self.project_name}_{self.bug_index}.json')
+        if os.path.exists(processed_command_file):
+            with open(processed_command_file, 'r') as f:
+                content = f.read()
+                commands = []
+                # Parse JSON objects from file (one per line or multiple)
+                for line in content.strip().split('\n'):
+                    if line.strip():
+                        try:
+                            commands.append(json.loads(line))
+                        except:
+                            pass
+
+                if len(commands) > interaction_num:
+                    commands = commands[:interaction_num]
+
+                self.commands_history = commands
+                logger.info(f"Loaded {len(commands)} processed commands from existing file")
+
+        # Load mutations history
+        mutants_file = os.path.join(directory, 'mutations_history', f'mutants_{self.project_name}_{self.bug_index}.json')
+        if os.path.exists(mutants_file):
+            with open(mutants_file, 'r') as f:
+                try:
+                    mutants = json.load(f)
+                    logger.info(f"Loaded mutations history with {len(mutants) if isinstance(mutants, list) else 'N/A'} entries")
+                except Exception as e:
+                    logger.warn(f"Error loading mutants: {e}")
+
+        # Set cycle count to start from the next interaction
+        self.cycle_count = interaction_num
+        # Update cycles_remaining to reflect the already-completed interactions
+        if self.cycle_budget is not None:
+            self.cycles_remaining = self.cycle_budget - interaction_num
+            logger.info(f"Cycles remaining: {self.cycles_remaining} (budget: {self.cycle_budget}, completed: {interaction_num})")
+        logger.info(f"Agent state loaded. Ready to start from interaction {interaction_num + 1}")
 
     def load_context(self,):
         #with open("experimental_setups/experiments_list.txt") as eht:

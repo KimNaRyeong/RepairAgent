@@ -41,7 +41,9 @@ class Agent(BaseAgent):
         triggering_prompt: str,
         config: Config,
         cycle_budget: Optional[int] = None,
-        experiment_file: str = None
+        experiment_file: str = None,
+        resume_from: Optional[int] = None,
+        source_experiment: Optional[str] = None
     ):
         super().__init__(
             ai_config=ai_config,
@@ -49,7 +51,9 @@ class Agent(BaseAgent):
             config=config,
             default_cycle_instruction=triggering_prompt,
             cycle_budget=cycle_budget,
-            experiment_file = experiment_file
+            experiment_file = experiment_file,
+            resume_from = resume_from,
+            source_experiment = source_experiment
         )
 
         self.memory = memory

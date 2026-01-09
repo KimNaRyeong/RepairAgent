@@ -97,6 +97,18 @@ import click
     multiple=False,
     help="the path to the file containing the configuration of the agent for the experiment.",
 )
+@click.option(
+    "--resume-from",
+    type=int,
+    default=None,
+    help="Resume from a specific interaction number (e.g., 19 to resume from interaction 19 and start at 20).",
+)
+@click.option(
+    "--source-experiment",
+    type=str,
+    default=None,
+    help="Source experiment directory to load state from (e.g., 'experiment_1'). Results will be saved to the current experiment.",
+)
 @click.pass_context
 def main(
     ctx: click.Context,
@@ -117,7 +129,9 @@ def main(
     ai_name: Optional[str],
     ai_role: Optional[str],
     ai_goal: tuple[str],
-    experiment_file: str
+    experiment_file: str,
+    resume_from: Optional[int],
+    source_experiment: Optional[str]
 ) -> None:
     """
     Welcome to AutoGPT an experimental open-source application showcasing the capabilities of the GPT-4 pushing the boundaries of AI.
@@ -149,7 +163,9 @@ def main(
             ai_name=ai_name,
             ai_role=ai_role,
             ai_goals=ai_goal,
-            experiment_file=experiment_file
+            experiment_file=experiment_file,
+            resume_from=resume_from,
+            source_experiment=source_experiment
         )
 
 
