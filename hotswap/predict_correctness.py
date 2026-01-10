@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath('..'))
-from atropos.model.gcn_model_fasttext_sentence import GCN, set_seed
+from Atropos.model.gcn_model_nhot_normal_center import GCN, set_seed
 
 def load_model_for_fold(fold, k, device, model_dir):
     """Load the trained model for a specific fold and k value."""
@@ -55,7 +55,7 @@ def main():
     set_seed(42)
 
     # Configuration
-    k = 8
+    k = 20
     label_criteria = 1
     embedding_size = 300
     threshold = 0.5
@@ -64,13 +64,12 @@ def main():
     print(f"Using device: {device}")
 
     # Paths
-    base_path = '/home/kimnal0/auto-code-rover/atropos'
-    RepairAgent/Atropos/trained_model/parallel/nhot_normal/center_vector/0.99_0.99/label_criteria_1/FA/20
-    model_dir = f'{base_path}/trained_model/parallel/embedding/fasttext/nhot_normal/sentence_vector/{embedding_size}d/not_add/label_criteria_{label_criteria}'
-    data_dir = f'{base_path}/data/parallel/embedding/fasttext/nhot_normal/sentence_vector/{embedding_size}d/not_add/label_criteria_{label_criteria}'
-    result_dir = f'{base_path}/results/parallel/embedding/fasttext/nhot_normal/sentence_vector/{embedding_size}d/not_add/label_criteria_{label_criteria}'
+    base_path = '/home/kimnal0/RepairAgent/Atropos'
+    model_dir = f'{base_path}/trained_model/parallel/nhot_normal/center_vector/0.99_0.99/label_criteria_{label_criteria}/FA'
+    data_dir = f'{base_path}/data/parallel/nhot_normal/center_vector/0.99_0.99/label_criteria_1'
+    result_dir = f'{base_path}/results/parallel/nhot_normal/center_vector/0.99_0.99/label_criteria_1'
 
-    test_tasks_file = os.path.join(result_dir, 'test_bug_names2.json')
+    test_tasks_file = os.path.join(result_dir, 'test_bug_names.json')
     dataset_file = os.path.join(data_dir, str(k), 'gcn_dataset.pth')
 
     # Load test task names
@@ -87,7 +86,7 @@ def main():
     dataset = dataset_dict['dataset']
 
     # Create task to data mapping
-    task_to_data = {data.task: data for data in dataset}
+    task_to_data = {data.bug_name: data for data in dataset}
 
     # Predictions storage
     predictions = {}
@@ -123,7 +122,7 @@ def main():
             }
 
     # Save predictions
-    output_dir = '/home/kimnal0/auto-code-rover/hotswap/predictions'
+    output_dir = '/home/kimnal0/RepairAgent/hotswap/predictions'
     os.makedirs(output_dir, exist_ok=True)
 
     output_file = os.path.join(output_dir, f'k{k}_predictions.json')

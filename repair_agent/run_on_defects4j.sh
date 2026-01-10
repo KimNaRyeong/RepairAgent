@@ -26,7 +26,15 @@ SOURCE_EXPERIMENT="${6:-}"
 # Export as environment variable so the agent can use it
 export EXPERIMENTS_LIST_FILE="$EXPERIMENTS_LIST"
 
-python3 experimental_setups/increment_experiment.py "$MODEL_PREFIX" "$EXPERIMENTS_LIST"
+# Add hotswap prefix if resuming
+if [ -n "$RESUME_FROM" ]; then
+    EXPERIMENT_PREFIX="hotswap_${MODEL_PREFIX}"
+    echo "Resuming experiment - using hotswap prefix"
+else
+    EXPERIMENT_PREFIX="$MODEL_PREFIX"
+fi
+
+python3 experimental_setups/increment_experiment.py "$EXPERIMENT_PREFIX" "$EXPERIMENTS_LIST"
 python3 construct_commands_descriptions.py
 input="$1"
 timeout_seconds=7200 # 2 hours
@@ -44,7 +52,7 @@ do
     python3 checkout_py.py "${tuple[0]}" "${tuple[1]}"
 
     # Build command with optional --resume-from and --source-experiment arguments
-    CMD="timeout $timeout_seconds ./run.sh --ai-settings ai_settings.yaml --model \"$MODEL_NAME\" -c -l 40 -m json_file --experiment-file \"$2\""
+    CMD="timeout $timeout_seconds ./run.sh --ai-settings ai_settings.yaml --model \"$MODEL_NAME\" -c -l 5 -m json_file --experiment-file \"$2\""
     if [ -n "$RESUME_FROM" ]; then
         CMD="$CMD --resume-from $RESUME_FROM"
         echo "Resuming from interaction $RESUME_FROM"

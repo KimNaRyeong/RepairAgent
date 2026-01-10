@@ -168,12 +168,16 @@ def run_auto_gpt(
     )
     logger.typewriter_log("Using Browser:", Fore.GREEN, config.selenium_web_browser)
 
+    # Determine cycle_budget from config
+    cycle_budget_value = config.continuous_limit if config.continuous_limit else None
+
     agent = Agent(
         memory=memory,
         command_registry=command_registry,
         triggering_prompt=DEFAULT_TRIGGERING_PROMPT,
         ai_config=ai_config,
         config=config,
+        cycle_budget=cycle_budget_value,
         experiment_file = experiment_file,
         resume_from = resume_from,
         source_experiment = source_experiment
@@ -264,32 +268,44 @@ def run_interaction_loop(
     ai_config = agent.ai_config
     logger.debug(f"{ai_config.ai_name} System Prompt: {str(agent.prompt_dictionary)}")
 
-    cycle_budget = cycles_remaining = _get_cycle_budget(
-        config.continuous_mode, config.continuous_limit
-    )
+    # If resuming from a previous interaction, use the agent's corrected cycles_remaining
+    if hasattr(agent, 'resume_from') and agent.resume_from is not None:
+        cycle_budget = agent.cycle_budget if agent.cycle_budget else 40
+        cycles_remaining = agent.cycles_remaining
+        logger.info(f"Resuming: cycle_budget={cycle_budget}, cycles_remaining={cycles_remaining}")
+    else:
+        cycle_budget = cycles_remaining = _get_cycle_budget(
+            config.continuous_mode, config.continuous_limit
+        )
     spinner = Spinner("Thinking...", plain_output=config.plain_output)
+    interrupt_count = 0  # Track number of Ctrl+C presses
 
     def graceful_agent_interrupt(signum: int, frame: Optional[FrameType]) -> None:
-        nonlocal cycle_budget, cycles_remaining, spinner
-        if cycles_remaining in [0, 1, math.inf]:
-            logger.typewriter_log(
-                "Interrupt signal received. Stopping continuous command execution "
-                "immediately.",
-                Fore.RED,
-            )
-            sys.exit()
-        else:
-            restart_spinner = spinner.running
-            if spinner.running:
-                spinner.stop()
+        nonlocal cycle_budget, cycles_remaining, spinner, interrupt_count
+        interrupt_count += 1
 
+        # Stop spinner immediately
+        if spinner.running:
+            spinner.stop()
+
+        if interrupt_count == 1:
+            # First Ctrl+C: graceful shutdown
             logger.typewriter_log(
-                "Interrupt signal received. Stopping continuous command execution.",
+                "Interrupt signal received. Stopping after current command completes.",
+                Fore.YELLOW,
+            )
+            logger.typewriter_log(
+                "Press Ctrl+C again to force immediate exit.",
+                Fore.YELLOW,
+            )
+            cycles_remaining = 0
+        else:
+            # Second Ctrl+C: immediate exit
+            logger.typewriter_log(
+                "Force exit requested. Stopping immediately.",
                 Fore.RED,
             )
-            cycles_remaining = 1
-            if restart_spinner:
-                spinner.start()
+            sys.exit(130)  # Standard exit code for SIGINT
 
     # Set up an interrupt signal for the agent.
     signal.signal(signal.SIGINT, graceful_agent_interrupt)
@@ -309,16 +325,21 @@ def run_interaction_loop(
         with spinner:
             command_name, command_args, assistant_reply_dict = agent.think()
 
+        # Decrement cycles_remaining after think() to properly check if this is the last cycle
+        cycles_remaining -= 1
+
         ###############
         # Update User #
         ###############
         # Print the assistant's thoughts and the next command to the user.
         update_user(config, ai_config, command_name, command_args, assistant_reply_dict)
 
+        
+
         ##################
         # Get user input #
         ##################
-        if cycles_remaining == 1:  # Last cycle
+        if cycles_remaining == 0:  # Last cycle
             user_feedback, user_input, new_cycles_remaining = get_user_feedback(
                 config,
                 ai_config,
@@ -365,11 +386,6 @@ def run_interaction_loop(
         ###################
         # Execute Command #
         ###################
-        # Decrement the cycle counter first to reduce the likelihood of a SIGINT
-        # happening during command execution, setting the cycles remaining to 1,
-        # and then having the decrement set it to 0, exiting the application.
-        if command_name != "human_feedback":
-            cycles_remaining -= 1
         result = agent.execute(command_name, command_args, user_input)
 
         processed_command_save_path = os.path.join(

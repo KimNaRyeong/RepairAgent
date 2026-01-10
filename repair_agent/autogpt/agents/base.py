@@ -319,26 +319,46 @@ please use the indicated format and produce a list, like this:
         # Split by ChatSequence markers
         sequences = content.split('============== ChatSequence ==============')
 
-        for seq_idx, sequence in enumerate(sequences[1:num_interactions+2]):  # Skip first empty part, take only needed interactions
-            # Find the last USER message in this sequence (which contains command result)
+        for seq_idx, sequence in enumerate(sequences[2:num_interactions+2]):  # Skip first empty part, take only needed interactions
+            # Find the USER message that contains command execution result
+            # Look for "The result of executing that last command is:" in user sections
             user_sections = sequence.split('------------------ USER ------------------')
-            if len(user_sections) >= 2:
-                # The last USER section contains the command execution result
-                last_user_message = user_sections[-1].split('------------------')[0].strip()
-                user_messages.append(last_user_message)
+
+            command_result_message = None
+            for section in user_sections[1:]:  # Skip first section (before first USER marker)
+                # Extract the message content (before next marker or end separator)
+                message_content = section.split('------------------')[0].strip()
+                message_content = message_content.split('==========================================')[0].strip()
+
+                # Check if this is a command result message
+                if "The result of executing that last command is:" in message_content:
+                    command_result_message = message_content
+                    break
+
+            if command_result_message:
+                # Remove the wrapper text "The result of executing that last command is:"
+                # because construct_base_prompt() will add it again
+                if command_result_message.startswith("The result of executing that last command is:"):
+                    # Extract only the actual command result
+                    actual_result = command_result_message.replace("The result of executing that last command is:", "", 1).strip()
+                    user_messages.append(actual_result)
+                else:
+                    user_messages.append(command_result_message)
             else:
                 # Fallback: empty message if parsing fails
                 user_messages.append(f"[Restored] Interaction {seq_idx+1} result")
 
         return user_messages
 
-    def load_state_from_files(self, interaction_num: int):
+    def load_state_from_files(self, resume_from: int):
         """Load agent state from existing files up to the specified interaction number.
 
         Args:
             interaction_num: The interaction number to resume from (e.g., 19 means load up to 19th, start from 20th)
         """
         from autogpt.llm.base import Message
+
+        interaction_num = resume_from - 1
 
         exps = self.exps
         # Use source_experiment if specified, otherwise use current experiment
@@ -350,10 +370,6 @@ please use the indicated format and produce a list, like this:
         # Parse prompt history to get user messages (command results)
         prompt_history_file = os.path.join(directory, 'logs', f'prompt_history_{self.project_name}_{self.bug_index}')
         user_messages = self._parse_prompt_history(prompt_history_file, interaction_num)
-
-        for i in user_messages:
-            print(i)
-            print("===========================")
 
         # Load model responses up to interaction_num
         model_responses_file = os.path.join(directory, 'responses', f'model_responses_{self.project_name}_{self.bug_index}.json')
@@ -374,51 +390,84 @@ please use the indicated format and produce a list, like this:
                     # print(json.dumps(response_dict))
                     # print("-------------------------------")
                     if idx < len(user_messages):
-                        self.history.add("user", user_messages[idx+1], "action_result")
-                        # print(user_messages[idx+1])
+                        self.history.add("user", user_messages[idx], "action_result")
+                        # print(user_messages[idx])
                     else:
                         # Fallback if user message not found
                         self.history.add("user", f"[Restored] Command {idx+1} executed", "action_result")
                         print(f"[Restored] Command {idx+1} executed")
-                    print("==============================")
+                
                 
 
-        # Load processed commands up to interaction_num
-        processed_command_file = os.path.join(directory, 'responses', f'processed_command_{self.project_name}_{self.bug_index}.json')
-        if os.path.exists(processed_command_file):
-            with open(processed_command_file, 'r') as f:
-                content = f.read()
-                commands = []
-                # Parse JSON objects from file (one per line or multiple)
-                for line in content.strip().split('\n'):
-                    if line.strip():
-                        try:
-                            commands.append(json.loads(line))
-                        except:
-                            pass
+        # Note: processed_command.json is NOT loaded here
+        # - It's just a logging file for executed commands
+        # - self.commands_history will be automatically reconstructed from self.history
+        #   by construct_commands_history() when build_prompt() is called
 
-                if len(commands) > interaction_num:
-                    commands = commands[:interaction_num]
+        # Set cycle count to the number of loaded interactions
 
-                self.commands_history = commands
-                logger.info(f"Loaded {len(commands)} processed commands from existing file")
-
-        # Load mutations history
-        mutants_file = os.path.join(directory, 'mutations_history', f'mutants_{self.project_name}_{self.bug_index}.json')
-        if os.path.exists(mutants_file):
-            with open(mutants_file, 'r') as f:
-                try:
-                    mutants = json.load(f)
-                    logger.info(f"Loaded mutations history with {len(mutants) if isinstance(mutants, list) else 'N/A'} entries")
-                except Exception as e:
-                    logger.warn(f"Error loading mutants: {e}")
-
-        # Set cycle count to start from the next interaction
         self.cycle_count = interaction_num
         # Update cycles_remaining to reflect the already-completed interactions
         if self.cycle_budget is not None:
             self.cycles_remaining = self.cycle_budget - interaction_num
             logger.info(f"Cycles remaining: {self.cycles_remaining} (budget: {self.cycle_budget}, completed: {interaction_num})")
+
+        # Copy files from source experiment to current experiment
+        if self.source_experiment:
+            # Copy prompt_history
+            source_prompt_file = os.path.join(directory, 'logs', f'prompt_history_{self.project_name}_{self.bug_index}')
+            target_prompt_file = os.path.join("experimental_setups", exps[-1], "logs", f"prompt_history_{self.project_name}_{self.bug_index}")
+
+            if os.path.exists(source_prompt_file):
+                with open(source_prompt_file, 'r') as src:
+                    content = src.read()
+                    # Split by ChatSequence markers
+                    sequences = content.split('============== ChatSequence ==============')
+                    # Keep sequences: index 0 is empty, indices 1 to interaction_num are the actual ChatSequences
+                    # Copy only completed interactions (not the last one, which will be reconstructed from history)
+                    sequences_to_copy = sequences[:interaction_num + 1]  # +1 because index 0 is empty
+
+                    # Write to target file
+                    with open(target_prompt_file, 'w') as tgt:
+                        tgt.write('============== ChatSequence =============='.join(sequences_to_copy))
+
+                    logger.info(f"Copied {interaction_num} ChatSequences from source prompt_history to current experiment")
+
+
+            # Copy processed_command
+            source_processed_file = os.path.join(directory, 'responses', f'processed_command_{self.project_name}_{self.bug_index}.json')
+            target_processed_file = os.path.join("experimental_setups", exps[-1], "responses", f"processed_command_{self.project_name}_{self.bug_index}.json")
+
+            if os.path.exists(source_processed_file):
+                with open(source_processed_file, 'r') as src:
+                    content = src.read()
+                    # Parse multiple JSON objects separated by newlines
+                    commands = []
+                    decoder = json.JSONDecoder()
+                    idx = 0
+                    while idx < len(content):
+                        content_from_idx = content[idx:].lstrip()
+                        if not content_from_idx:
+                            break
+                        try:
+                            obj, end_idx = decoder.raw_decode(content_from_idx)
+                            commands.append(obj)
+                            idx += len(content[idx:]) - len(content_from_idx) + end_idx
+                        except json.JSONDecodeError:
+                            break
+
+                    commands_to_copy = commands[:interaction_num]
+
+                    with open(target_processed_file, 'w') as tgt:
+                        for cmd in commands_to_copy:
+                            tgt.write(json.dumps(cmd, indent=2))
+                            tgt.write('\n')
+
+                    logger.info(f"Copied {len(commands_to_copy)} processed commands from source experiment to current experiment")
+
+        # Restore current_state from history by scanning for state transition messages
+        self._restore_state_from_history()
+
         logger.info(f"Agent state loaded. Ready to start from interaction {interaction_num + 1}")
 
     def load_context(self,):
@@ -814,13 +863,46 @@ please use the indicated format and produce a list, like this:
         self.prompt_dictionary["commands"][2] = self.cmds_by_state[state_name]
         self.current_state = state_name
 
+    def _restore_state_from_history(self):
+        """
+        Restore the current state from history after resume.
+        Scans all history messages in forward order to find the most recent state transition.
+        This is only called once during load_state_from_files().
+        """
+        from autogpt.logs import logger
+
+        most_recent_state = None
+
+        # Scan ALL history in forward order to find the latest state transition
+        for i in range(len(self.history)):
+            if self.history[i].role == "user":
+                # Check for state transition messages in user responses
+                if "Hypothesis discarded! You are now back at the state 'collect information to understand the bug'" in self.history[i].content:
+                    most_recent_state = "collect information to understand the bug"
+                elif "You are now back at the state 'collect information to fix the bug'" in self.history[i].content:
+                    most_recent_state = "collect information to fix the bug"
+                elif "Since you have a hypothesis about the bug, the current state have been changed from 'collect information to understand the bug' to 'collect information to fix the bug'" in self.history[i].content:
+                    most_recent_state = "collect information to fix the bug"
+                elif "\n **Note:** You are automatically switched to the state 'trying out candidate fixes'" in self.history[i].content:
+                    most_recent_state = "trying out candidate fixes"
+
+        # Update to the most recent state found
+        if most_recent_state:
+            logger.info(f"Restoring state from history: {most_recent_state} (scanned {len(self.history)} history messages)")
+            self.update_prompt_state(most_recent_state)
+        else:
+            logger.info(f"No state transitions found in history, keeping initial state: {self.current_state}")
+
     def switch_state(self):
         """
         check whether the last executed command causes a state change.
         If so, update the prompt based on the changed state
         """
-        
+        print("Investigated history: ")
         for i in range(len(self.history)-1, 0, -1):
+            print(self.history[i])
+            print(self.current_state)
+            print("----------------------------------")
             if self.history[i].role == "assistant":
                 if "Hypothesis discarded! You are now back at the state 'collect information to understand the bug'" in self.history[i+1].content:
                     if self.current_state != "collect information to understand the bug":
@@ -835,6 +917,7 @@ please use the indicated format and produce a list, like this:
                     if self.current_state != "trying out candidate fixes":
                         self.update_prompt_state("trying out candidate fixes")
                 break
+        print(self.current_state)
 
     def construct_hypothesises_context(self,):
         hypothesis_string = "## Hypothesis about the bug:\n"
@@ -1236,6 +1319,9 @@ please use the indicated format and produce a list, like this:
             prompt.insert(history_start_index, new_summary_msg)
 
         """
+        # Add history to prompt including when resuming
+        # Resume should continue from the last interaction, so include the last command and result
+
         if len(self.history) > 2:
             last_command = self.history[-2]
             command_result = self.history[-1]
