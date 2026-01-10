@@ -48,11 +48,41 @@ do
 
     tuple=($line)
     echo ${tuple[0]}, ${tuple[1]}
+
+    # Check if source experiment is provided and validate processed_command count
+    if [ -n "$SOURCE_EXPERIMENT" ]; then
+        PROCESSED_CMD_FILE="experimental_setups/$SOURCE_EXPERIMENT/processed_response/processed_command_${tuple[0]}_${tuple[1]}.json"
+
+        # Check if processed_command file exists
+        if [ ! -f "$PROCESSED_CMD_FILE" ]; then
+            echo "Skipping ${tuple[0]} ${tuple[1]}: processed_command file not found in source experiment"
+            continue
+        fi
+
+        # Count number of commands in the file (count lines with "command_name")
+        CMD_COUNT=$(grep -c '"command_name"' "$PROCESSED_CMD_FILE" 2>/dev/null || echo "0")
+
+        # Calculate minimum required commands (RESUME_FROM - 1)
+        if [ -n "$RESUME_FROM" ]; then
+            MIN_REQUIRED=$((RESUME_FROM - 1))
+        else
+            MIN_REQUIRED=0
+        fi
+
+        # Skip if command count is less than required
+        if [ "$CMD_COUNT" -le "$MIN_REQUIRED" ]; then
+            echo "Skipping ${tuple[0]} ${tuple[1]}: only $CMD_COUNT commands found (need > $MIN_REQUIRED)"
+            continue
+        fi
+
+        echo "Processing ${tuple[0]} ${tuple[1]}: $CMD_COUNT commands found (> $MIN_REQUIRED required)"
+    fi
+
     python3 prepare_ai_settings.py "${tuple[0]}" "${tuple[1]}"
     python3 checkout_py.py "${tuple[0]}" "${tuple[1]}"
 
     # Build command with optional --resume-from and --source-experiment arguments
-    CMD="timeout $timeout_seconds ./run.sh --ai-settings ai_settings.yaml --model \"$MODEL_NAME\" -c -l 5 -m json_file --experiment-file \"$2\""
+    CMD="timeout $timeout_seconds ./run.sh --ai-settings ai_settings.yaml --model \"$MODEL_NAME\" -c -l 40 -m json_file --experiment-file \"$2\""
     if [ -n "$RESUME_FROM" ]; then
         CMD="$CMD --resume-from $RESUME_FROM"
         echo "Resuming from interaction $RESUME_FROM"

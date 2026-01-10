@@ -349,6 +349,32 @@ please use the indicated format and produce a list, like this:
                 user_messages.append(f"[Restored] Interaction {seq_idx+1} result")
 
         return user_messages
+    
+    def _convert_response_to_string_list(self, input_text):
+        command_str_list = []
+        pattern = r"(\{\s*\n\"thoughts\".*?\n\})(?:\s*\{|$)"
+        
+        search_start = 0
+
+        while search_start < len(input_text):
+            remaining = input_text[search_start:]
+            # print(remaining)
+            # print('----------')
+            match = re.search(pattern, remaining, re.DOTALL)
+
+            if not match:
+                break
+            # print(match.start(), remaining[match.start():match.start()+10])
+            # print(match.end(), remaining[match.end():match.end()+10])
+
+            abs_start = search_start + match.start()
+            abs_end = search_start + match.end() -1
+
+            command_str_list.append(match.group(1))
+
+            search_start = abs_end
+        
+        return command_str_list
 
     def load_state_from_files(self, resume_from: int):
         """Load agent state from existing files up to the specified interaction number.
@@ -372,30 +398,34 @@ please use the indicated format and produce a list, like this:
         user_messages = self._parse_prompt_history(prompt_history_file, interaction_num)
 
         # Load model responses up to interaction_num
-        model_responses_file = os.path.join(directory, 'responses', f'model_responses_{self.project_name}_{self.bug_index}.json')
+        model_responses_file = os.path.join(directory, 'responses', f'model_responses_{self.project_name}_{self.bug_index}')
+
         if os.path.exists(model_responses_file):
             with open(model_responses_file, 'r') as f:
-                responses = json.load(f)
-                # Load only up to interaction_num
-                if len(responses) > interaction_num:
-                    responses = responses[:interaction_num]
-                logger.info(f"Loaded {len(responses)} model responses from existing file")
+                responses_content = f.read()
+            
+            responses = self._convert_response_to_string_list(responses_content)
 
-                # Reconstruct history from responses with corresponding user messages
-                for idx, response in enumerate(responses):
-                    response_dict = json.loads(response) if isinstance(response, str) else response
-                    # Add assistant message to history
-                    self.history.add("assistant", json.dumps(response_dict), "action")
-                    # Add corresponding user message (command result) from prompt history
-                    # print(json.dumps(response_dict))
-                    # print("-------------------------------")
-                    if idx < len(user_messages):
-                        self.history.add("user", user_messages[idx], "action_result")
-                        # print(user_messages[idx])
-                    else:
-                        # Fallback if user message not found
-                        self.history.add("user", f"[Restored] Command {idx+1} executed", "action_result")
-                        print(f"[Restored] Command {idx+1} executed")
+            # Load only up to interaction_num
+            if len(responses) > interaction_num:
+                responses = responses[:interaction_num]
+            logger.info(f"Loaded {len(responses)} model responses from existing file")
+
+            # Reconstruct history from responses with corresponding user messages
+            for idx, response in enumerate(responses):
+                response_dict = json.loads(response) if isinstance(response, str) else response
+                # Add assistant message to history
+                self.history.add("assistant", json.dumps(response_dict), "action")
+                # Add corresponding user message (command result) from prompt history
+                # print(json.dumps(response_dict))
+                # print("-------------------------------")
+                if idx < len(user_messages):
+                    self.history.add("user", user_messages[idx], "action_result")
+                    # print(user_messages[idx])
+                else:
+                    # Fallback if user message not found
+                    self.history.add("user", f"[Restored] Command {idx+1} executed", "action_result")
+                    print(f"[Restored] Command {idx+1} executed")
                 
                 
 
