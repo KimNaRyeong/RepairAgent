@@ -1,4 +1,4 @@
-./run_on_defects4j.sh ./experimental_setups/bugs_list_hotswap_fold1 ./hyperparams.json gpt-4o experimental_setups/experiments_list_fold1.txt 20 experiment_1
+# ./run_on_defects4j.sh ./experimental_setups/bugs_list_hotswap_fold1 ./hyperparams.json gpt-4o experimental_setups/experiments_list_fold1.txt 20 experiment_1
 ./run_on_defects4j.sh ./experimental_setups/bugs_list_hotswap_fold1 ./hyperparams.json gpt-4o experimental_setups/experiments_list_fold1.txt 20 experiment_2
 ./run_on_defects4j.sh ./experimental_setups/bugs_list_hotswap_fold1 ./hyperparams.json gpt-4o experimental_setups/experiments_list_fold1.txt 20 experiment_3
 ./run_on_defects4j.sh ./experimental_setups/bugs_list_hotswap_fold1 ./hyperparams.json gpt-4o experimental_setups/experiments_list_fold1.txt 20 experiment_4

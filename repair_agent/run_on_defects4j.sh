@@ -52,6 +52,7 @@ do
     # Check if source experiment is provided and validate processed_command count
     if [ -n "$SOURCE_EXPERIMENT" ]; then
         PROCESSED_CMD_FILE="experimental_setups/$SOURCE_EXPERIMENT/processed_response/processed_command_${tuple[0]}_${tuple[1]}.json"
+        echo $PROCESSED_CMD_FILE
 
         # Check if processed_command file exists
         if [ ! -f "$PROCESSED_CMD_FILE" ]; then
