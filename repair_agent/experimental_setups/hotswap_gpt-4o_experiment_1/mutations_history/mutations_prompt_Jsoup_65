@@ -1,0 +1,2556 @@
+What follows are sections of the most important information that we have gathered so far about the bug.        Make usage of the following information to suggest mutations of fixes:
+## Info about the bug (bug report summary):
+### Bug info:
+Root cause in triggering tests:
+ - org.jsoup.parser.HtmlParserTest::testTemplateInsideTable
+   --> junit.framework.AssertionFailedError
+
+The bug is located at exactly these lines numbers: (the format is file-name#line-number# line-code):
+org/jsoup/parser/HtmlTreeBuilder.java#360#        clearStackToContext("tbody", "tfoot", "thead");
+org/jsoup/parser/HtmlTreeBuilder.java#364#        clearStackToContext("tr");
+org/jsoup/parser/HtmlTreeBuilderState.java#1036#                    if (name.equals("tr")) {
+org/jsoup/parser/HtmlTreeBuilderState.java#1096#                if (StringUtil.in(name, "th", "td")) {
+
+The following is the list of buggy methods:
+org.jsoup.parser.HtmlTreeBuilder.clearStackToTableBodyContext()V,1
+org.jsoup.parser.HtmlTreeBuilder.clearStackToTableRowContext()V,1
+org.jsoup.parser.HtmlTreeBuilderState$14.process(Lorg/jsoup/parser/Token;Lorg/jsoup/parser/HtmlTreeBuilder;)Z,1
+org.jsoup.parser.HtmlTreeBuilderState$13.process(Lorg/jsoup/parser/Token;Lorg/jsoup/parser/HtmlTreeBuilder;)Z,1
+
+### Test cases results:
+There are 1 failing test cases, here is the full log of failing cases:
+--- org.jsoup.parser.HtmlParserTest::testTemplateInsideTable
+junit.framework.AssertionFailedError
+	at org.jsoup.parser.HtmlParserTest.testTemplateInsideTable(HtmlParserTest.java:1045)
+### The code of the failing test cases:
+Extracting test code from file org/jsoup/parser/HtmlParserTest.java returned: Command extract_test_code returned: public void testTemplateInsideTable() throws IOException {
+        File in = ParseTest.getFile("/htmltests/table-polymer-template.html");
+        Document doc = Jsoup.parse(in, "UTF-8");
+        doc.outputSettings().prettyPrint(true);
+
+        Elements templates = doc.body().getElementsByTag("template");
+        for (Element template : templates) {
+            assertTrue(template.childNodes().size() > 1);
+        }
+  }
+}
+
+
+## Read lines:
+Lines 360 to 364 from file: org/jsoup/parser/HtmlTreeBuilder.java
+Command read_range returned: Line 360:        clearStackToContext("tbody", "tfoot", "thead");
+Line 361:    }
+Line 362:
+Line 363:    void clearStackToTableRowContext() {
+Line 364:        clearStackToContext("tr");
+
+Lines 200 to 250 from file: org/jsoup/parser/HtmlTreeBuilder.java
+Command read_range returned: Line 200:            tokeniser.transition(TokeniserState.Data); // handles <script />, otherwise needs breakout steps from script data
+Line 201:            tokeniser.emit(emptyEnd.reset().name(el.tagName()));  // ensure we get out of whatever state we are in. emitted for yielded processing
+Line 202:            return el;
+Line 203:        }
+Line 204:        
+Line 205:        Element el = new Element(Tag.valueOf(startTag.name(), settings), baseUri, settings.normalizeAttributes(startTag.attributes));
+Line 206:        insert(el);
+Line 207:        return el;
+Line 208:    }
+Line 209:
+Line 210:    Element insertStartTag(String startTagName) {
+Line 211:        Element el = new Element(Tag.valueOf(startTagName, settings), baseUri);
+Line 212:        insert(el);
+Line 213:        return el;
+Line 214:    }
+Line 215:
+Line 216:    void insert(Element el) {
+Line 217:        insertNode(el);
+Line 218:        stack.add(el);
+Line 219:    }
+Line 220:
+Line 221:    Element insertEmpty(Token.StartTag startTag) {
+Line 222:        Tag tag = Tag.valueOf(startTag.name(), settings);
+Line 223:        Element el = new Element(tag, baseUri, startTag.attributes);
+Line 224:        insertNode(el);
+Line 225:        if (startTag.isSelfClosing()) {
+Line 226:            if (tag.isKnownTag()) {
+Line 227:                if (!tag.isEmpty())
+Line 228:                    tokeniser.error("Tag cannot be self closing; not a void tag");
+Line 229:            }
+Line 230:            else // unknown tag, remember this is self closing for output
+Line 231:                tag.setSelfClosing();
+Line 232:        }
+Line 233:        return el;
+Line 234:    }
+Line 235:
+Line 236:    FormElement insertForm(Token.StartTag startTag, boolean onStack) {
+Line 237:        Tag tag = Tag.valueOf(startTag.name(), settings);
+Line 238:        FormElement el = new FormElement(tag, baseUri, startTag.attributes);
+Line 239:        setFormElement(el);
+Line 240:        insertNode(el);
+Line 241:        if (onStack)
+Line 242:            stack.add(el);
+Line 243:        return el;
+Line 244:    }
+Line 245:
+Line 246:    void insert(Token.Comment commentToken) {
+Line 247:        Comment comment = new Comment(commentToken.getData());
+Line 248:        insertNode(comment);
+Line 249:    }
+Line 250:
+
+Lines 1030 to 1100 from file: org/jsoup/parser/HtmlTreeBuilderState.java
+Command read_range returned: Line 1030:    InTableBody {
+Line 1031:        boolean process(Token t, HtmlTreeBuilder tb) {
+Line 1032:            switch (t.type) {
+Line 1033:                case StartTag:
+Line 1034:                    Token.StartTag startTag = t.asStartTag();
+Line 1035:                    String name = startTag.normalName();
+Line 1036:                    if (name.equals("tr")) {
+Line 1037:                        tb.clearStackToTableBodyContext();
+Line 1038:                        tb.insert(startTag);
+Line 1039:                        tb.transition(InRow);
+Line 1040:                    } else if (StringUtil.in(name, "th", "td")) {
+Line 1041:                        tb.error(this);
+Line 1042:                        tb.processStartTag("tr");
+Line 1043:                        return tb.process(startTag);
+Line 1044:                    } else if (StringUtil.in(name, "caption", "col", "colgroup", "tbody", "tfoot", "thead")) {
+Line 1045:                        return exitTableBody(t, tb);
+Line 1046:                    } else
+Line 1047:                        return anythingElse(t, tb);
+Line 1048:                    break;
+Line 1049:                case EndTag:
+Line 1050:                    Token.EndTag endTag = t.asEndTag();
+Line 1051:                    name = endTag.normalName();
+Line 1052:                    if (StringUtil.in(name, "tbody", "tfoot", "thead")) {
+Line 1053:                        if (!tb.inTableScope(name)) {
+Line 1054:                            tb.error(this);
+Line 1055:                            return false;
+Line 1056:                        } else {
+Line 1057:                            tb.clearStackToTableBodyContext();
+Line 1058:                            tb.pop();
+Line 1059:                            tb.transition(InTable);
+Line 1060:                        }
+Line 1061:                    } else if (name.equals("table")) {
+Line 1062:                        return exitTableBody(t, tb);
+Line 1063:                    } else if (StringUtil.in(name, "body", "caption", "col", "colgroup", "html", "td", "th", "tr")) {
+Line 1064:                        tb.error(this);
+Line 1065:                        return false;
+Line 1066:                    } else
+Line 1067:                        return anythingElse(t, tb);
+Line 1068:                    break;
+Line 1069:                default:
+Line 1070:                    return anythingElse(t, tb);
+Line 1071:            }
+Line 1072:            return true;
+Line 1073:        }
+Line 1074:
+Line 1075:        private boolean exitTableBody(Token t, HtmlTreeBuilder tb) {
+Line 1076:            if (!(tb.inTableScope("tbody") || tb.inTableScope("thead") || tb.inScope("tfoot"))) {
+Line 1077:                // frag case
+Line 1078:                tb.error(this);
+Line 1079:                return false;
+Line 1080:            }
+Line 1081:            tb.clearStackToTableBodyContext();
+Line 1082:            tb.processEndTag(tb.currentElement().nodeName()); // tbody, tfoot, thead
+Line 1083:            return tb.process(t);
+Line 1084:        }
+Line 1085:
+Line 1086:        private boolean anythingElse(Token t, HtmlTreeBuilder tb) {
+Line 1087:            return tb.process(t, InTable);
+Line 1088:        }
+Line 1089:    },
+Line 1090:    InRow {
+Line 1091:        boolean process(Token t, HtmlTreeBuilder tb) {
+Line 1092:            if (t.isStartTag()) {
+Line 1093:                Token.StartTag startTag = t.asStartTag();
+Line 1094:                String name = startTag.normalName();
+Line 1095:
+Line 1096:                if (StringUtil.in(name, "th", "td")) {
+Line 1097:                    tb.clearStackToTableRowContext();
+Line 1098:                    tb.insert(startTag);
+Line 1099:                    tb.transition(InCell);
+Line 1100:                    tb.insertMarkerToFormattingElements();
+
+
+
+## Suggested fixes:
+This is the list of suggested fixes so far but none of them worked:
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'insertions': [], 'deletions': [], 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'target_lines': [['360', '        clearStackToContext("tbody", "tfoot", "thead");'], ['364', '        clearStackToContext("tr");']], 'insertions': [], 'deletions': [], 'modifications': []}, {'file_name': 'org/jsoup/parser/HtmlTreeBuilderState.java', 'target_lines': [['1036', '                    if (name.equals("tr")) {'], ['1096', '                if (StringUtil.in(name, "th", "td")) {']], 'insertions': [], 'deletions': [], 'modifications': []}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'target_lines': [['360', '        clearStackToContext("tbody", "tfoot", "thead");'], ['364', '        clearStackToContext("tr");']], 'insertions': [], 'deletions': [], 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}, {'file_name': 'org/jsoup/parser/HtmlTreeBuilderState.java', 'target_lines': [['1036', '                    if (name.equals("tr")) {'], ['1096', '                if (StringUtil.in(name, "th", "td")) {']], 'insertions': [], 'deletions': [], 'modifications': [{'line_number': 1036, 'modified_line': '                    if (name.equals("tr")) {'}, {'line_number': 1096, 'modified_line': '                if (StringUtil.in(name, "th", "td")) {'}]}]
+
+
+## The list of emplementations of some methods in the code base:
+Command extract_method_code returned: We found the following implementations for the method name clearStackToContext (we give the body of the method):
+### Implementation candidate 0:
+    private void clearStackToContext(String... nodeNames) {
+        for (int pos = stack.size() -1; pos >= 0; pos--) {
+            Element next = stack.get(pos);
+            if (StringUtil.in(next.nodeName(), nodeNames) || next.nodeName().equals("html"))
+                break;
+            else
+                stack.remove(pos);
+        }
+    }
+Command extract_method_code returned: We found the following implementations for the method name clearStackToContext (we give the body of the method):
+### Implementation candidate 0:
+    private void clearStackToContext(String... nodeNames) {
+        for (int pos = stack.size() -1; pos >= 0; pos--) {
+            Element next = stack.get(pos);
+            if (StringUtil.in(next.nodeName(), nodeNames) || next.nodeName().equals("html"))
+                break;
+            else
+                stack.remove(pos);
+        }
+    }
+Command extract_method_code returned: We found the following implementations for the method name clearStackToContext (we give the body of the method):
+### Implementation candidate 0:
+    private void clearStackToContext(String... nodeNames) {
+        for (int pos = stack.size() -1; pos >= 0; pos--) {
+            Element next = stack.get(pos);
+            if (StringUtil.in(next.nodeName(), nodeNames) || next.nodeName().equals("html"))
+                break;
+            else
+                stack.remove(pos);
+        }
+    }
+Command extract_method_code returned: We found the following implementations for the method name process (we give the body of the method):
+### Implementation candidate 0:
+    protected boolean process(Token token) {
+        currentToken = token;
+        return this.state.process(token, this);
+    }
+### Implementation candidate 1:
+    boolean process(Token token, HtmlTreeBuilderState state) {
+        currentToken = token;
+        return state.process(token, this);
+    }
+
+Command extract_method_code returned a lengthy response, we truncated it to the first 4000 characters: We found the following implementations for the method name process (we give the body of the method):
+### Implementation candidate 0:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                // todo: parse error check on expected doctypes
+                // todo: quirk state check on doctype ids
+                Token.Doctype d = t.asDoctype();
+                DocumentType doctype = new DocumentType(
+                    tb.settings.normalizeTag(d.getName()), d.getPublicIdentifier(), d.getSystemIdentifier());
+                doctype.setPubSysKey(d.getPubSysKey());
+                tb.getDocument().appendChild(doctype);
+                if (d.isForceQuirks())
+                    tb.getDocument().quirksMode(Document.QuirksMode.quirks);
+                tb.transition(BeforeHtml);
+            } else {
+                // todo: check not iframe srcdoc
+                tb.transition(BeforeHtml);
+                return tb.process(t); // re-process token
+            }
+            return true;
+        }
+### Implementation candidate 1:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                tb.insert(t.asStartTag());
+                tb.transition(BeforeHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                return anythingElse(t, tb);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                return anythingElse(t, tb);
+            }
+            return true;
+        }
+### Implementation candidate 2:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                return InBody.process(t, tb); // does not transition
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("head")) {
+                Element head = tb.insert(t.asStartTag());
+                tb.setHeadElement(head);
+                tb.transition(InHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                tb.processStartTag("head");
+                return tb.process(t);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                tb.processStartTag("head");
+                return tb.process(t);
+            }
+            return true;
+        }
+### Implementation candidate 3:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                tb.insert(t.asCharacter());
+                return true;
+            }
+            switch (t.type) {
+                case Comment:
+                    tb.insert(t.asComment());
+                    break;
+                case Doctype:
+                    tb.error(this);
+                    return false;
+                case StartTag:
+                    Token.StartTag start = t.asStartTag();
+                    String name = start.normalName();
+                    if (name.equals("html")) {
+                        return InBody.process(t, tb);
+                    }
+Command extract_method_code returned: We found the following implementations for the method name clearStackToTableBodyContext (we give the body of the method):
+### Implementation candidate 0:
+    void clearStackToTableBodyContext() {
+        clearStackToContext("tbody", "tfoot", "thead");
+    }
+
+Command extract_method_code returned: We found the following implementations for the method name clearStackToTableRowContext (we give the body of the method):
+### Implementation candidate 0:
+    void clearStackToTableRowContext() {
+        clearStackToContext("tr");
+    }
+
+Command extract_method_code returned a lengthy response, we truncated it to the first 4000 characters: We found the following implementations for the method name process (we give the body of the method):
+### Implementation candidate 0:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                // todo: parse error check on expected doctypes
+                // todo: quirk state check on doctype ids
+                Token.Doctype d = t.asDoctype();
+                DocumentType doctype = new DocumentType(
+                    tb.settings.normalizeTag(d.getName()), d.getPublicIdentifier(), d.getSystemIdentifier());
+                doctype.setPubSysKey(d.getPubSysKey());
+                tb.getDocument().appendChild(doctype);
+                if (d.isForceQuirks())
+                    tb.getDocument().quirksMode(Document.QuirksMode.quirks);
+                tb.transition(BeforeHtml);
+            } else {
+                // todo: check not iframe srcdoc
+                tb.transition(BeforeHtml);
+                return tb.process(t); // re-process token
+            }
+            return true;
+        }
+### Implementation candidate 1:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                tb.insert(t.asStartTag());
+                tb.transition(BeforeHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                return anythingElse(t, tb);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                return anythingElse(t, tb);
+            }
+            return true;
+        }
+### Implementation candidate 2:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                return InBody.process(t, tb); // does not transition
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("head")) {
+                Element head = tb.insert(t.asStartTag());
+                tb.setHeadElement(head);
+                tb.transition(InHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                tb.processStartTag("head");
+                return tb.process(t);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                tb.processStartTag("head");
+                return tb.process(t);
+            }
+            return true;
+        }
+### Implementation candidate 3:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                tb.insert(t.asCharacter());
+                return true;
+            }
+            switch (t.type) {
+                case Comment:
+                    tb.insert(t.asComment());
+                    break;
+                case Doctype:
+                    tb.error(this);
+                    return false;
+                case StartTag:
+                    Token.StartTag start = t.asStartTag();
+                    String name = start.normalName();
+                    if (name.equals("html")) {
+                        return InBody.process(t, tb);
+                    }
+
+## Functions calls extracted based on snippets of code and target files:
+Code snippet: clearStackToContext
+target file: org/jsoup/parser/HtmlTreeBuilder.java
+similar functions calls that were found:
+Command extract_similar_functions_calls returned: Error: expected string or bytes-like object
+
+
+## Executed search queries within the code base:
+Searching keywords: ['clearStackToContext'], returned the following results:
+Command search_code_base returned: The following matches were found:
+{'/workspaces/RepairAgent2/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java': {'HtmlTreeBuilder': {'clearStackToContext': ['clearstacktocontext', 'clearstacktocontext']}}}
+The search also matched the following files names:
+
+Searching keywords: ['clearStackToContext'], returned the following results:
+Command search_code_base returned: The following matches were found:
+{'/workspaces/RepairAgent2/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java': {'HtmlTreeBuilder': {'clearStackToContext': ['clearstacktocontext', 'clearstacktocontext']}}}
+The search also matched the following files names:
+
+Searching keywords: ['process'], returned the following results:
+Command search_code_base returned: The following matches were found:
+{'/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/helper/HttpConnection.java': {'Response': {'processResponseHeaders': ['process', 'process']}}, '/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/TreeBuilder.java': {'TreeBuilder': {'process': ['process', 'process'], 'processStartTag': ['process', 'process'], 'processEndTag': ['process', 'process']}}, '/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/XmlTreeBuilder.java': {'XmlTreeBuilder': {'process': ['process', 'process']}}, '/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java': {'HtmlTreeBuilder': {'process': ['process', 'process']}}}
+The search also matched the following files names: 
+
+
+
+## The format of the fix
+This is the description of the json format in which you should write your fixes (respect this format when calling the commands write_fix and try_fixes):
+The provided format is a list of dictionaries, each representing a set of edits to a specific file. Each dictionary contains the following keys:
+    "file_name": A string indicating the path or name of the file to be modified.
+    "insertions": A list of dictionaries representing insertions in the file. Each insertion dictionary includes:
+        "line_number": An integer indicating the line number where the insertion should occur.
+        "new_lines": A list of strings representing the new lines to be inserted.
+    "deletions": A list of integers representing line numbers to be deleted from the file.
+    "modifications": A list of dictionaries representing modifications in the file. Each modification dictionary includes:
+        "line_number": An integer indicating the line number to be modified.
+        "modified_line": A string representing the modified content for that line.
+Here is an example:
+[
+    # changes in file 1
+    {
+        "file_name": "org/jfree/data/time/Week.java",
+        "insertions": [
+            {
+                "line_number": 175,
+                "new_lines": [
+                    "    // ... new lines to insert ...\n",
+                    "    // ... more new lines ...\n"
+                ]
+            },
+            {
+                "line_number": 180,
+                "new_lines": [
+                    "    // ... additional new lines ...\n"
+                ]
+            }
+        ],
+        "deletions": [179, 183],
+        "modifications": [
+            {
+                "line_number": 179,
+                "modified_line": "    if (dataset == null) {\n"
+            },
+            {
+                "line_number": 185,
+                "modified_line": "    int seriesCount = dataset.getColumnCount();\n"
+            }
+        ]
+    },
+    # changes in file 2
+    {
+        "file_name": "org/jfree/data/time/Day.java",
+        "insertions": [],
+        "deletions": [],
+        "modifications": [
+            {
+                "line_number": 203,
+                "modified_line": "    days = 0\n"
+            },
+            {
+                "line_number": 307,
+                "modified_line": "    super()\n"
+            }
+        ]
+    }
+]Here are some hints that might help you in suggesting good mutations:
+1: Think of mutating comparison operators in a condition, e.g, < to >= and == to !=... Consider all possibilities and combinations even == to >, != to <= ...for example.
+    Original: if x < 10:
+    Fix: if x >= 10:
+- 2: Think of replacing variables with explicit values (when possible) or with close variable names
+    Original: result = add(x, y)
+    Fix: result = add(5, 8)
+    
+    Original: mult = y + 1
+    Fix:  add = z + 1
+- 3: Consider changing some tokens partially, e.g, minXXX to maxXXX startXXX to endXXX, vice versa and so on... (consider all possibilities)
+    Original: start_elements_valid = True
+    Fix: end_elements_valid = True
+- 4: Think of making conditions more complex (by adding 'and' / 'or' operators and the corresponding part) or less complex (by removing some of 'and'/ 'or' parts)
+    Original: if (x > 0 and y < 5):
+    More complex condition: if (x > 0 and y < 5 and z == 10):
+    Less complex condition: if (x > 0):
+- 5: if your patch consists only of adding a comment or modifying a line into a comment, you should discard the patch and try to suggest mutation of the buggy line(s) of code instead
+    Orginal: '// Modify the logic for finding wrap position and padding text here to address the bug'
+    Fix: pos = findWrapperPosition(text, width, start);
+- 6: in some cases you will be required to insert new lines of code, you should consider adding more lines at given location. Usually, the code around the insertion location give you an idea about the lines to insert. Also the type of assertion failure.
+    Example:
+     if (!Double.isNaN(v)) {
+        min = Math.min(minimum, v);
++       max = Math.max(maximum, v); // insertion happened here
+        }
+    if (!Double.isNaN(u)) {
++       minimum = Math.min(min, u);// insertion happened here
+        maximum = Math.max(max, u);
+        }
+- 7: pay attention to the comments and doc string above the buggy code, specifically if any important comments exist above or next to buggy lines.
+    Example:
+    // - verify the header checksum
+    This comment indicates that a verification of the header checksum, which can be done by calling a method dedicated for that.
+- 8: the usual fix of some null pointer exceptions is to add a condition on the variable(s) that can be null.
+    Original: entity.create()
+    Fix: if (entity != null){
+        entity.create()
+    }
+- 9: Do not modify a file by replacing lines with a comment. If you want to delete a line you can add its number to the list of lines to delete.
+Always suggest code and not comments only.
+Example of forbidden fix because it only writes a comment and not actual code:
+    {
+        modifications: [{"line_number": 105, "modified_line": "// need to improve this code"}]
+    }
+- 10: Pay attention the type of variables. The code before and after the buggy lines might give hints of what the type of a variable should be.
+Example:
+    int x = 20;
+    double y = x * x; // x should have been declared as double in the previous line
+- 11: You also should be careful with types in java, especially numerical types.
+For example int * int might produce a double which means it should be stored in double variable
+Another example is int + int would also produce double.
+
+- 12: If the buggy line is a method signature, consider changing the signature of the method. Also, consider checking similar methods or neighboring methods by searching the code base.
+Examples:
+    change private to public or protected and vice-versa
+    change the type of an argument
+    add or remove an argument
+
+Your fix should target all the following lines by at least one edit type (modification, insertion, or deletion):
+360 from file: org/jsoup/parser/HtmlTreeBuilder.java
+364 from file: org/jsoup/parser/HtmlTreeBuilder.java
+1036 from file: org/jsoup/parser/HtmlTreeBuilderState.java
+1096 from file: org/jsoup/parser/HtmlTreeBuilderState.java
+
+Task for assistant:  generate 30 mutants of the target buggy lines. Respect the fix format, only change values (never touch keys). For every mutant generate a full fix dictionary. Put the 30 mutants in a main list.To generate the list of your mutations, fillout the following template multiple time with different variants:
+[{"file_name": "org/jsoup/parser/HtmlTreeBuilder.java", "target_lines": [["360", "        clearStackToContext(\"tbody\", \"tfoot\", \"thead\");"], ["364", "        clearStackToContext(\"tr\");"]], "insertions": [here put the list of insertion dictionaries. DO NOT REPEAT ALREADY EXISTING LINES!: {"line_numbe":..., "new_lines":[...]}, ...], "deletions": [here put the lines number to delete...], "modifications": [here put the list of modification dictionaries {"line_number":..., "modified_line":...}, ...]}, {"file_name": "org/jsoup/parser/HtmlTreeBuilderState.java", "target_lines": [["1036", "                    if (name.equals(\"tr\")) {"], ["1096", "                if (StringUtil.in(name, \"th\", \"td\")) {"]], "insertions": [here put the list of insertion dictionaries. DO NOT REPEAT ALREADY EXISTING LINES!: {"line_numbe":..., "new_lines":[...]}, ...], "deletions": [here put the lines number to delete...], "modifications": [here put the list of modification dictionaries {"line_number":..., "modified_line":...}, ...]}]
+What follows are sections of the most important information that we have gathered so far about the bug.        Make usage of the following information to suggest mutations of fixes:
+## Info about the bug (bug report summary):
+### Bug info:
+Root cause in triggering tests:
+ - org.jsoup.parser.HtmlParserTest::testTemplateInsideTable
+   --> junit.framework.AssertionFailedError
+
+The bug is located at exactly these lines numbers: (the format is file-name#line-number# line-code):
+org/jsoup/parser/HtmlTreeBuilder.java#360#        clearStackToContext("tbody", "tfoot", "thead");
+org/jsoup/parser/HtmlTreeBuilder.java#364#        clearStackToContext("tr");
+org/jsoup/parser/HtmlTreeBuilderState.java#1036#                    if (name.equals("tr")) {
+org/jsoup/parser/HtmlTreeBuilderState.java#1096#                if (StringUtil.in(name, "th", "td")) {
+
+The following is the list of buggy methods:
+org.jsoup.parser.HtmlTreeBuilder.clearStackToTableBodyContext()V,1
+org.jsoup.parser.HtmlTreeBuilder.clearStackToTableRowContext()V,1
+org.jsoup.parser.HtmlTreeBuilderState$14.process(Lorg/jsoup/parser/Token;Lorg/jsoup/parser/HtmlTreeBuilder;)Z,1
+org.jsoup.parser.HtmlTreeBuilderState$13.process(Lorg/jsoup/parser/Token;Lorg/jsoup/parser/HtmlTreeBuilder;)Z,1
+
+### Test cases results:
+There are 1 failing test cases, here is the full log of failing cases:
+--- org.jsoup.parser.HtmlParserTest::testTemplateInsideTable
+junit.framework.AssertionFailedError
+	at org.jsoup.parser.HtmlParserTest.testTemplateInsideTable(HtmlParserTest.java:1045)
+### The code of the failing test cases:
+Extracting test code from file org/jsoup/parser/HtmlParserTest.java returned: Command extract_test_code returned: public void testTemplateInsideTable() throws IOException {
+        File in = ParseTest.getFile("/htmltests/table-polymer-template.html");
+        Document doc = Jsoup.parse(in, "UTF-8");
+        doc.outputSettings().prettyPrint(true);
+
+        Elements templates = doc.body().getElementsByTag("template");
+        for (Element template : templates) {
+            assertTrue(template.childNodes().size() > 1);
+        }
+  }
+}
+
+
+## Read lines:
+Lines 360 to 364 from file: org/jsoup/parser/HtmlTreeBuilder.java
+Command read_range returned: Line 360:        clearStackToContext("tbody", "tfoot", "thead");
+Line 361:    }
+Line 362:
+Line 363:    void clearStackToTableRowContext() {
+Line 364:        clearStackToContext("tr");
+
+Lines 200 to 250 from file: org/jsoup/parser/HtmlTreeBuilder.java
+Command read_range returned: Line 200:            tokeniser.transition(TokeniserState.Data); // handles <script />, otherwise needs breakout steps from script data
+Line 201:            tokeniser.emit(emptyEnd.reset().name(el.tagName()));  // ensure we get out of whatever state we are in. emitted for yielded processing
+Line 202:            return el;
+Line 203:        }
+Line 204:        
+Line 205:        Element el = new Element(Tag.valueOf(startTag.name(), settings), baseUri, settings.normalizeAttributes(startTag.attributes));
+Line 206:        insert(el);
+Line 207:        return el;
+Line 208:    }
+Line 209:
+Line 210:    Element insertStartTag(String startTagName) {
+Line 211:        Element el = new Element(Tag.valueOf(startTagName, settings), baseUri);
+Line 212:        insert(el);
+Line 213:        return el;
+Line 214:    }
+Line 215:
+Line 216:    void insert(Element el) {
+Line 217:        insertNode(el);
+Line 218:        stack.add(el);
+Line 219:    }
+Line 220:
+Line 221:    Element insertEmpty(Token.StartTag startTag) {
+Line 222:        Tag tag = Tag.valueOf(startTag.name(), settings);
+Line 223:        Element el = new Element(tag, baseUri, startTag.attributes);
+Line 224:        insertNode(el);
+Line 225:        if (startTag.isSelfClosing()) {
+Line 226:            if (tag.isKnownTag()) {
+Line 227:                if (!tag.isEmpty())
+Line 228:                    tokeniser.error("Tag cannot be self closing; not a void tag");
+Line 229:            }
+Line 230:            else // unknown tag, remember this is self closing for output
+Line 231:                tag.setSelfClosing();
+Line 232:        }
+Line 233:        return el;
+Line 234:    }
+Line 235:
+Line 236:    FormElement insertForm(Token.StartTag startTag, boolean onStack) {
+Line 237:        Tag tag = Tag.valueOf(startTag.name(), settings);
+Line 238:        FormElement el = new FormElement(tag, baseUri, startTag.attributes);
+Line 239:        setFormElement(el);
+Line 240:        insertNode(el);
+Line 241:        if (onStack)
+Line 242:            stack.add(el);
+Line 243:        return el;
+Line 244:    }
+Line 245:
+Line 246:    void insert(Token.Comment commentToken) {
+Line 247:        Comment comment = new Comment(commentToken.getData());
+Line 248:        insertNode(comment);
+Line 249:    }
+Line 250:
+
+Lines 1030 to 1100 from file: org/jsoup/parser/HtmlTreeBuilderState.java
+Command read_range returned: Line 1030:    InTableBody {
+Line 1031:        boolean process(Token t, HtmlTreeBuilder tb) {
+Line 1032:            switch (t.type) {
+Line 1033:                case StartTag:
+Line 1034:                    Token.StartTag startTag = t.asStartTag();
+Line 1035:                    String name = startTag.normalName();
+Line 1036:                    if (name.equals("tr")) {
+Line 1037:                        tb.clearStackToTableBodyContext();
+Line 1038:                        tb.insert(startTag);
+Line 1039:                        tb.transition(InRow);
+Line 1040:                    } else if (StringUtil.in(name, "th", "td")) {
+Line 1041:                        tb.error(this);
+Line 1042:                        tb.processStartTag("tr");
+Line 1043:                        return tb.process(startTag);
+Line 1044:                    } else if (StringUtil.in(name, "caption", "col", "colgroup", "tbody", "tfoot", "thead")) {
+Line 1045:                        return exitTableBody(t, tb);
+Line 1046:                    } else
+Line 1047:                        return anythingElse(t, tb);
+Line 1048:                    break;
+Line 1049:                case EndTag:
+Line 1050:                    Token.EndTag endTag = t.asEndTag();
+Line 1051:                    name = endTag.normalName();
+Line 1052:                    if (StringUtil.in(name, "tbody", "tfoot", "thead")) {
+Line 1053:                        if (!tb.inTableScope(name)) {
+Line 1054:                            tb.error(this);
+Line 1055:                            return false;
+Line 1056:                        } else {
+Line 1057:                            tb.clearStackToTableBodyContext();
+Line 1058:                            tb.pop();
+Line 1059:                            tb.transition(InTable);
+Line 1060:                        }
+Line 1061:                    } else if (name.equals("table")) {
+Line 1062:                        return exitTableBody(t, tb);
+Line 1063:                    } else if (StringUtil.in(name, "body", "caption", "col", "colgroup", "html", "td", "th", "tr")) {
+Line 1064:                        tb.error(this);
+Line 1065:                        return false;
+Line 1066:                    } else
+Line 1067:                        return anythingElse(t, tb);
+Line 1068:                    break;
+Line 1069:                default:
+Line 1070:                    return anythingElse(t, tb);
+Line 1071:            }
+Line 1072:            return true;
+Line 1073:        }
+Line 1074:
+Line 1075:        private boolean exitTableBody(Token t, HtmlTreeBuilder tb) {
+Line 1076:            if (!(tb.inTableScope("tbody") || tb.inTableScope("thead") || tb.inScope("tfoot"))) {
+Line 1077:                // frag case
+Line 1078:                tb.error(this);
+Line 1079:                return false;
+Line 1080:            }
+Line 1081:            tb.clearStackToTableBodyContext();
+Line 1082:            tb.processEndTag(tb.currentElement().nodeName()); // tbody, tfoot, thead
+Line 1083:            return tb.process(t);
+Line 1084:        }
+Line 1085:
+Line 1086:        private boolean anythingElse(Token t, HtmlTreeBuilder tb) {
+Line 1087:            return tb.process(t, InTable);
+Line 1088:        }
+Line 1089:    },
+Line 1090:    InRow {
+Line 1091:        boolean process(Token t, HtmlTreeBuilder tb) {
+Line 1092:            if (t.isStartTag()) {
+Line 1093:                Token.StartTag startTag = t.asStartTag();
+Line 1094:                String name = startTag.normalName();
+Line 1095:
+Line 1096:                if (StringUtil.in(name, "th", "td")) {
+Line 1097:                    tb.clearStackToTableRowContext();
+Line 1098:                    tb.insert(startTag);
+Line 1099:                    tb.transition(InCell);
+Line 1100:                    tb.insertMarkerToFormattingElements();
+
+
+
+## Suggested fixes:
+This is the list of suggested fixes so far but none of them worked:
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'insertions': [], 'deletions': [], 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'target_lines': [['360', '        clearStackToContext("tbody", "tfoot", "thead");'], ['364', '        clearStackToContext("tr");']], 'insertions': [], 'deletions': [], 'modifications': []}, {'file_name': 'org/jsoup/parser/HtmlTreeBuilderState.java', 'target_lines': [['1036', '                    if (name.equals("tr")) {'], ['1096', '                if (StringUtil.in(name, "th", "td")) {']], 'insertions': [], 'deletions': [], 'modifications': []}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'target_lines': [['360', '        clearStackToContext("tbody", "tfoot", "thead");'], ['364', '        clearStackToContext("tr");']], 'insertions': [], 'deletions': [], 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}, {'file_name': 'org/jsoup/parser/HtmlTreeBuilderState.java', 'target_lines': [['1036', '                    if (name.equals("tr")) {'], ['1096', '                if (StringUtil.in(name, "th", "td")) {']], 'insertions': [], 'deletions': [], 'modifications': [{'line_number': 1036, 'modified_line': '                    if (name.equals("tr")) {'}, {'line_number': 1096, 'modified_line': '                if (StringUtil.in(name, "th", "td")) {'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilderState.java', 'modifications': [{'line_number': 1036, 'modified_line': 'if (name.equals("tr") || StringUtil.in(name, "th", "td")) {'}, {'line_number': 1040, 'modified_line': 'tb.transition(InRow);'}, {'line_number': 1096, 'modified_line': 'if (StringUtil.in(name, "th", "td", "tr")) {'}]}]
+
+
+## The list of emplementations of some methods in the code base:
+Command extract_method_code returned: We found the following implementations for the method name clearStackToContext (we give the body of the method):
+### Implementation candidate 0:
+    private void clearStackToContext(String... nodeNames) {
+        for (int pos = stack.size() -1; pos >= 0; pos--) {
+            Element next = stack.get(pos);
+            if (StringUtil.in(next.nodeName(), nodeNames) || next.nodeName().equals("html"))
+                break;
+            else
+                stack.remove(pos);
+        }
+    }
+Command extract_method_code returned: We found the following implementations for the method name clearStackToContext (we give the body of the method):
+### Implementation candidate 0:
+    private void clearStackToContext(String... nodeNames) {
+        for (int pos = stack.size() -1; pos >= 0; pos--) {
+            Element next = stack.get(pos);
+            if (StringUtil.in(next.nodeName(), nodeNames) || next.nodeName().equals("html"))
+                break;
+            else
+                stack.remove(pos);
+        }
+    }
+Command extract_method_code returned: We found the following implementations for the method name clearStackToContext (we give the body of the method):
+### Implementation candidate 0:
+    private void clearStackToContext(String... nodeNames) {
+        for (int pos = stack.size() -1; pos >= 0; pos--) {
+            Element next = stack.get(pos);
+            if (StringUtil.in(next.nodeName(), nodeNames) || next.nodeName().equals("html"))
+                break;
+            else
+                stack.remove(pos);
+        }
+    }
+Command extract_method_code returned: We found the following implementations for the method name process (we give the body of the method):
+### Implementation candidate 0:
+    protected boolean process(Token token) {
+        currentToken = token;
+        return this.state.process(token, this);
+    }
+### Implementation candidate 1:
+    boolean process(Token token, HtmlTreeBuilderState state) {
+        currentToken = token;
+        return state.process(token, this);
+    }
+
+Command extract_method_code returned a lengthy response, we truncated it to the first 4000 characters: We found the following implementations for the method name process (we give the body of the method):
+### Implementation candidate 0:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                // todo: parse error check on expected doctypes
+                // todo: quirk state check on doctype ids
+                Token.Doctype d = t.asDoctype();
+                DocumentType doctype = new DocumentType(
+                    tb.settings.normalizeTag(d.getName()), d.getPublicIdentifier(), d.getSystemIdentifier());
+                doctype.setPubSysKey(d.getPubSysKey());
+                tb.getDocument().appendChild(doctype);
+                if (d.isForceQuirks())
+                    tb.getDocument().quirksMode(Document.QuirksMode.quirks);
+                tb.transition(BeforeHtml);
+            } else {
+                // todo: check not iframe srcdoc
+                tb.transition(BeforeHtml);
+                return tb.process(t); // re-process token
+            }
+            return true;
+        }
+### Implementation candidate 1:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                tb.insert(t.asStartTag());
+                tb.transition(BeforeHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                return anythingElse(t, tb);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                return anythingElse(t, tb);
+            }
+            return true;
+        }
+### Implementation candidate 2:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                return InBody.process(t, tb); // does not transition
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("head")) {
+                Element head = tb.insert(t.asStartTag());
+                tb.setHeadElement(head);
+                tb.transition(InHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                tb.processStartTag("head");
+                return tb.process(t);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                tb.processStartTag("head");
+                return tb.process(t);
+            }
+            return true;
+        }
+### Implementation candidate 3:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                tb.insert(t.asCharacter());
+                return true;
+            }
+            switch (t.type) {
+                case Comment:
+                    tb.insert(t.asComment());
+                    break;
+                case Doctype:
+                    tb.error(this);
+                    return false;
+                case StartTag:
+                    Token.StartTag start = t.asStartTag();
+                    String name = start.normalName();
+                    if (name.equals("html")) {
+                        return InBody.process(t, tb);
+                    }
+Command extract_method_code returned: We found the following implementations for the method name clearStackToTableBodyContext (we give the body of the method):
+### Implementation candidate 0:
+    void clearStackToTableBodyContext() {
+        clearStackToContext("tbody", "tfoot", "thead");
+    }
+
+Command extract_method_code returned: We found the following implementations for the method name clearStackToTableRowContext (we give the body of the method):
+### Implementation candidate 0:
+    void clearStackToTableRowContext() {
+        clearStackToContext("tr");
+    }
+
+Command extract_method_code returned a lengthy response, we truncated it to the first 4000 characters: We found the following implementations for the method name process (we give the body of the method):
+### Implementation candidate 0:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                // todo: parse error check on expected doctypes
+                // todo: quirk state check on doctype ids
+                Token.Doctype d = t.asDoctype();
+                DocumentType doctype = new DocumentType(
+                    tb.settings.normalizeTag(d.getName()), d.getPublicIdentifier(), d.getSystemIdentifier());
+                doctype.setPubSysKey(d.getPubSysKey());
+                tb.getDocument().appendChild(doctype);
+                if (d.isForceQuirks())
+                    tb.getDocument().quirksMode(Document.QuirksMode.quirks);
+                tb.transition(BeforeHtml);
+            } else {
+                // todo: check not iframe srcdoc
+                tb.transition(BeforeHtml);
+                return tb.process(t); // re-process token
+            }
+            return true;
+        }
+### Implementation candidate 1:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                tb.insert(t.asStartTag());
+                tb.transition(BeforeHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                return anythingElse(t, tb);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                return anythingElse(t, tb);
+            }
+            return true;
+        }
+### Implementation candidate 2:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                return InBody.process(t, tb); // does not transition
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("head")) {
+                Element head = tb.insert(t.asStartTag());
+                tb.setHeadElement(head);
+                tb.transition(InHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                tb.processStartTag("head");
+                return tb.process(t);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                tb.processStartTag("head");
+                return tb.process(t);
+            }
+            return true;
+        }
+### Implementation candidate 3:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                tb.insert(t.asCharacter());
+                return true;
+            }
+            switch (t.type) {
+                case Comment:
+                    tb.insert(t.asComment());
+                    break;
+                case Doctype:
+                    tb.error(this);
+                    return false;
+                case StartTag:
+                    Token.StartTag start = t.asStartTag();
+                    String name = start.normalName();
+                    if (name.equals("html")) {
+                        return InBody.process(t, tb);
+                    }
+
+## Functions calls extracted based on snippets of code and target files:
+Code snippet: clearStackToContext
+target file: org/jsoup/parser/HtmlTreeBuilder.java
+similar functions calls that were found:
+Command extract_similar_functions_calls returned: Error: expected string or bytes-like object
+
+
+## Executed search queries within the code base:
+Searching keywords: ['clearStackToContext'], returned the following results:
+Command search_code_base returned: The following matches were found:
+{'/workspaces/RepairAgent2/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java': {'HtmlTreeBuilder': {'clearStackToContext': ['clearstacktocontext', 'clearstacktocontext']}}}
+The search also matched the following files names:
+
+Searching keywords: ['clearStackToContext'], returned the following results:
+Command search_code_base returned: The following matches were found:
+{'/workspaces/RepairAgent2/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java': {'HtmlTreeBuilder': {'clearStackToContext': ['clearstacktocontext', 'clearstacktocontext']}}}
+The search also matched the following files names:
+
+Searching keywords: ['process'], returned the following results:
+Command search_code_base returned: The following matches were found:
+{'/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/helper/HttpConnection.java': {'Response': {'processResponseHeaders': ['process', 'process']}}, '/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/TreeBuilder.java': {'TreeBuilder': {'process': ['process', 'process'], 'processStartTag': ['process', 'process'], 'processEndTag': ['process', 'process']}}, '/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/XmlTreeBuilder.java': {'XmlTreeBuilder': {'process': ['process', 'process']}}, '/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java': {'HtmlTreeBuilder': {'process': ['process', 'process']}}}
+The search also matched the following files names: 
+
+
+
+## The format of the fix
+This is the description of the json format in which you should write your fixes (respect this format when calling the commands write_fix and try_fixes):
+The provided format is a list of dictionaries, each representing a set of edits to a specific file. Each dictionary contains the following keys:
+    "file_name": A string indicating the path or name of the file to be modified.
+    "insertions": A list of dictionaries representing insertions in the file. Each insertion dictionary includes:
+        "line_number": An integer indicating the line number where the insertion should occur.
+        "new_lines": A list of strings representing the new lines to be inserted.
+    "deletions": A list of integers representing line numbers to be deleted from the file.
+    "modifications": A list of dictionaries representing modifications in the file. Each modification dictionary includes:
+        "line_number": An integer indicating the line number to be modified.
+        "modified_line": A string representing the modified content for that line.
+Here is an example:
+[
+    # changes in file 1
+    {
+        "file_name": "org/jfree/data/time/Week.java",
+        "insertions": [
+            {
+                "line_number": 175,
+                "new_lines": [
+                    "    // ... new lines to insert ...\n",
+                    "    // ... more new lines ...\n"
+                ]
+            },
+            {
+                "line_number": 180,
+                "new_lines": [
+                    "    // ... additional new lines ...\n"
+                ]
+            }
+        ],
+        "deletions": [179, 183],
+        "modifications": [
+            {
+                "line_number": 179,
+                "modified_line": "    if (dataset == null) {\n"
+            },
+            {
+                "line_number": 185,
+                "modified_line": "    int seriesCount = dataset.getColumnCount();\n"
+            }
+        ]
+    },
+    # changes in file 2
+    {
+        "file_name": "org/jfree/data/time/Day.java",
+        "insertions": [],
+        "deletions": [],
+        "modifications": [
+            {
+                "line_number": 203,
+                "modified_line": "    days = 0\n"
+            },
+            {
+                "line_number": 307,
+                "modified_line": "    super()\n"
+            }
+        ]
+    }
+]Here are some hints that might help you in suggesting good mutations:
+1: Think of mutating comparison operators in a condition, e.g, < to >= and == to !=... Consider all possibilities and combinations even == to >, != to <= ...for example.
+    Original: if x < 10:
+    Fix: if x >= 10:
+- 2: Think of replacing variables with explicit values (when possible) or with close variable names
+    Original: result = add(x, y)
+    Fix: result = add(5, 8)
+    
+    Original: mult = y + 1
+    Fix:  add = z + 1
+- 3: Consider changing some tokens partially, e.g, minXXX to maxXXX startXXX to endXXX, vice versa and so on... (consider all possibilities)
+    Original: start_elements_valid = True
+    Fix: end_elements_valid = True
+- 4: Think of making conditions more complex (by adding 'and' / 'or' operators and the corresponding part) or less complex (by removing some of 'and'/ 'or' parts)
+    Original: if (x > 0 and y < 5):
+    More complex condition: if (x > 0 and y < 5 and z == 10):
+    Less complex condition: if (x > 0):
+- 5: if your patch consists only of adding a comment or modifying a line into a comment, you should discard the patch and try to suggest mutation of the buggy line(s) of code instead
+    Orginal: '// Modify the logic for finding wrap position and padding text here to address the bug'
+    Fix: pos = findWrapperPosition(text, width, start);
+- 6: in some cases you will be required to insert new lines of code, you should consider adding more lines at given location. Usually, the code around the insertion location give you an idea about the lines to insert. Also the type of assertion failure.
+    Example:
+     if (!Double.isNaN(v)) {
+        min = Math.min(minimum, v);
++       max = Math.max(maximum, v); // insertion happened here
+        }
+    if (!Double.isNaN(u)) {
++       minimum = Math.min(min, u);// insertion happened here
+        maximum = Math.max(max, u);
+        }
+- 7: pay attention to the comments and doc string above the buggy code, specifically if any important comments exist above or next to buggy lines.
+    Example:
+    // - verify the header checksum
+    This comment indicates that a verification of the header checksum, which can be done by calling a method dedicated for that.
+- 8: the usual fix of some null pointer exceptions is to add a condition on the variable(s) that can be null.
+    Original: entity.create()
+    Fix: if (entity != null){
+        entity.create()
+    }
+- 9: Do not modify a file by replacing lines with a comment. If you want to delete a line you can add its number to the list of lines to delete.
+Always suggest code and not comments only.
+Example of forbidden fix because it only writes a comment and not actual code:
+    {
+        modifications: [{"line_number": 105, "modified_line": "// need to improve this code"}]
+    }
+- 10: Pay attention the type of variables. The code before and after the buggy lines might give hints of what the type of a variable should be.
+Example:
+    int x = 20;
+    double y = x * x; // x should have been declared as double in the previous line
+- 11: You also should be careful with types in java, especially numerical types.
+For example int * int might produce a double which means it should be stored in double variable
+Another example is int + int would also produce double.
+
+- 12: If the buggy line is a method signature, consider changing the signature of the method. Also, consider checking similar methods or neighboring methods by searching the code base.
+Examples:
+    change private to public or protected and vice-versa
+    change the type of an argument
+    add or remove an argument
+
+Your fix should target all the following lines by at least one edit type (modification, insertion, or deletion):
+360 from file: org/jsoup/parser/HtmlTreeBuilder.java
+364 from file: org/jsoup/parser/HtmlTreeBuilder.java
+1036 from file: org/jsoup/parser/HtmlTreeBuilderState.java
+1096 from file: org/jsoup/parser/HtmlTreeBuilderState.java
+
+Task for assistant:  generate 30 mutants of the target buggy lines. Respect the fix format, only change values (never touch keys). For every mutant generate a full fix dictionary. Put the 30 mutants in a main list.To generate the list of your mutations, fillout the following template multiple time with different variants:
+[{"file_name": "org/jsoup/parser/HtmlTreeBuilder.java", "target_lines": [["360", "        clearStackToContext(\"tbody\", \"tfoot\", \"thead\");"], ["364", "        clearStackToContext(\"tr\");"]], "insertions": [here put the list of insertion dictionaries. DO NOT REPEAT ALREADY EXISTING LINES!: {"line_numbe":..., "new_lines":[...]}, ...], "deletions": [here put the lines number to delete...], "modifications": [here put the list of modification dictionaries {"line_number":..., "modified_line":...}, ...]}, {"file_name": "org/jsoup/parser/HtmlTreeBuilderState.java", "target_lines": [["1036", "                    if (name.equals(\"tr\")) {"], ["1096", "                if (StringUtil.in(name, \"th\", \"td\")) {"]], "insertions": [here put the list of insertion dictionaries. DO NOT REPEAT ALREADY EXISTING LINES!: {"line_numbe":..., "new_lines":[...]}, ...], "deletions": [here put the lines number to delete...], "modifications": [here put the list of modification dictionaries {"line_number":..., "modified_line":...}, ...]}]
+What follows are sections of the most important information that we have gathered so far about the bug.        Make usage of the following information to suggest mutations of fixes:
+## Info about the bug (bug report summary):
+### Bug info:
+Root cause in triggering tests:
+ - org.jsoup.parser.HtmlParserTest::testTemplateInsideTable
+   --> junit.framework.AssertionFailedError
+
+The bug is located at exactly these lines numbers: (the format is file-name#line-number# line-code):
+org/jsoup/parser/HtmlTreeBuilder.java#360#        clearStackToContext("tbody", "tfoot", "thead");
+org/jsoup/parser/HtmlTreeBuilder.java#364#        clearStackToContext("tr");
+org/jsoup/parser/HtmlTreeBuilderState.java#1036#                    if (name.equals("tr")) {
+org/jsoup/parser/HtmlTreeBuilderState.java#1096#                if (StringUtil.in(name, "th", "td")) {
+
+The following is the list of buggy methods:
+org.jsoup.parser.HtmlTreeBuilder.clearStackToTableBodyContext()V,1
+org.jsoup.parser.HtmlTreeBuilder.clearStackToTableRowContext()V,1
+org.jsoup.parser.HtmlTreeBuilderState$14.process(Lorg/jsoup/parser/Token;Lorg/jsoup/parser/HtmlTreeBuilder;)Z,1
+org.jsoup.parser.HtmlTreeBuilderState$13.process(Lorg/jsoup/parser/Token;Lorg/jsoup/parser/HtmlTreeBuilder;)Z,1
+
+### Test cases results:
+There are 1 failing test cases, here is the full log of failing cases:
+--- org.jsoup.parser.HtmlParserTest::testTemplateInsideTable
+junit.framework.AssertionFailedError
+	at org.jsoup.parser.HtmlParserTest.testTemplateInsideTable(HtmlParserTest.java:1045)
+### The code of the failing test cases:
+Extracting test code from file org/jsoup/parser/HtmlParserTest.java returned: Command extract_test_code returned: public void testTemplateInsideTable() throws IOException {
+        File in = ParseTest.getFile("/htmltests/table-polymer-template.html");
+        Document doc = Jsoup.parse(in, "UTF-8");
+        doc.outputSettings().prettyPrint(true);
+
+        Elements templates = doc.body().getElementsByTag("template");
+        for (Element template : templates) {
+            assertTrue(template.childNodes().size() > 1);
+        }
+  }
+}
+
+
+## Read lines:
+Lines 360 to 364 from file: org/jsoup/parser/HtmlTreeBuilder.java
+Command read_range returned: Line 360:        clearStackToContext("tbody", "tfoot", "thead");
+Line 361:    }
+Line 362:
+Line 363:    void clearStackToTableRowContext() {
+Line 364:        clearStackToContext("tr");
+
+Lines 200 to 250 from file: org/jsoup/parser/HtmlTreeBuilder.java
+Command read_range returned: Line 200:            tokeniser.transition(TokeniserState.Data); // handles <script />, otherwise needs breakout steps from script data
+Line 201:            tokeniser.emit(emptyEnd.reset().name(el.tagName()));  // ensure we get out of whatever state we are in. emitted for yielded processing
+Line 202:            return el;
+Line 203:        }
+Line 204:        
+Line 205:        Element el = new Element(Tag.valueOf(startTag.name(), settings), baseUri, settings.normalizeAttributes(startTag.attributes));
+Line 206:        insert(el);
+Line 207:        return el;
+Line 208:    }
+Line 209:
+Line 210:    Element insertStartTag(String startTagName) {
+Line 211:        Element el = new Element(Tag.valueOf(startTagName, settings), baseUri);
+Line 212:        insert(el);
+Line 213:        return el;
+Line 214:    }
+Line 215:
+Line 216:    void insert(Element el) {
+Line 217:        insertNode(el);
+Line 218:        stack.add(el);
+Line 219:    }
+Line 220:
+Line 221:    Element insertEmpty(Token.StartTag startTag) {
+Line 222:        Tag tag = Tag.valueOf(startTag.name(), settings);
+Line 223:        Element el = new Element(tag, baseUri, startTag.attributes);
+Line 224:        insertNode(el);
+Line 225:        if (startTag.isSelfClosing()) {
+Line 226:            if (tag.isKnownTag()) {
+Line 227:                if (!tag.isEmpty())
+Line 228:                    tokeniser.error("Tag cannot be self closing; not a void tag");
+Line 229:            }
+Line 230:            else // unknown tag, remember this is self closing for output
+Line 231:                tag.setSelfClosing();
+Line 232:        }
+Line 233:        return el;
+Line 234:    }
+Line 235:
+Line 236:    FormElement insertForm(Token.StartTag startTag, boolean onStack) {
+Line 237:        Tag tag = Tag.valueOf(startTag.name(), settings);
+Line 238:        FormElement el = new FormElement(tag, baseUri, startTag.attributes);
+Line 239:        setFormElement(el);
+Line 240:        insertNode(el);
+Line 241:        if (onStack)
+Line 242:            stack.add(el);
+Line 243:        return el;
+Line 244:    }
+Line 245:
+Line 246:    void insert(Token.Comment commentToken) {
+Line 247:        Comment comment = new Comment(commentToken.getData());
+Line 248:        insertNode(comment);
+Line 249:    }
+Line 250:
+
+Lines 1030 to 1100 from file: org/jsoup/parser/HtmlTreeBuilderState.java
+Command read_range returned: Line 1030:    InTableBody {
+Line 1031:        boolean process(Token t, HtmlTreeBuilder tb) {
+Line 1032:            switch (t.type) {
+Line 1033:                case StartTag:
+Line 1034:                    Token.StartTag startTag = t.asStartTag();
+Line 1035:                    String name = startTag.normalName();
+Line 1036:                    if (name.equals("tr")) {
+Line 1037:                        tb.clearStackToTableBodyContext();
+Line 1038:                        tb.insert(startTag);
+Line 1039:                        tb.transition(InRow);
+Line 1040:                    } else if (StringUtil.in(name, "th", "td")) {
+Line 1041:                        tb.error(this);
+Line 1042:                        tb.processStartTag("tr");
+Line 1043:                        return tb.process(startTag);
+Line 1044:                    } else if (StringUtil.in(name, "caption", "col", "colgroup", "tbody", "tfoot", "thead")) {
+Line 1045:                        return exitTableBody(t, tb);
+Line 1046:                    } else
+Line 1047:                        return anythingElse(t, tb);
+Line 1048:                    break;
+Line 1049:                case EndTag:
+Line 1050:                    Token.EndTag endTag = t.asEndTag();
+Line 1051:                    name = endTag.normalName();
+Line 1052:                    if (StringUtil.in(name, "tbody", "tfoot", "thead")) {
+Line 1053:                        if (!tb.inTableScope(name)) {
+Line 1054:                            tb.error(this);
+Line 1055:                            return false;
+Line 1056:                        } else {
+Line 1057:                            tb.clearStackToTableBodyContext();
+Line 1058:                            tb.pop();
+Line 1059:                            tb.transition(InTable);
+Line 1060:                        }
+Line 1061:                    } else if (name.equals("table")) {
+Line 1062:                        return exitTableBody(t, tb);
+Line 1063:                    } else if (StringUtil.in(name, "body", "caption", "col", "colgroup", "html", "td", "th", "tr")) {
+Line 1064:                        tb.error(this);
+Line 1065:                        return false;
+Line 1066:                    } else
+Line 1067:                        return anythingElse(t, tb);
+Line 1068:                    break;
+Line 1069:                default:
+Line 1070:                    return anythingElse(t, tb);
+Line 1071:            }
+Line 1072:            return true;
+Line 1073:        }
+Line 1074:
+Line 1075:        private boolean exitTableBody(Token t, HtmlTreeBuilder tb) {
+Line 1076:            if (!(tb.inTableScope("tbody") || tb.inTableScope("thead") || tb.inScope("tfoot"))) {
+Line 1077:                // frag case
+Line 1078:                tb.error(this);
+Line 1079:                return false;
+Line 1080:            }
+Line 1081:            tb.clearStackToTableBodyContext();
+Line 1082:            tb.processEndTag(tb.currentElement().nodeName()); // tbody, tfoot, thead
+Line 1083:            return tb.process(t);
+Line 1084:        }
+Line 1085:
+Line 1086:        private boolean anythingElse(Token t, HtmlTreeBuilder tb) {
+Line 1087:            return tb.process(t, InTable);
+Line 1088:        }
+Line 1089:    },
+Line 1090:    InRow {
+Line 1091:        boolean process(Token t, HtmlTreeBuilder tb) {
+Line 1092:            if (t.isStartTag()) {
+Line 1093:                Token.StartTag startTag = t.asStartTag();
+Line 1094:                String name = startTag.normalName();
+Line 1095:
+Line 1096:                if (StringUtil.in(name, "th", "td")) {
+Line 1097:                    tb.clearStackToTableRowContext();
+Line 1098:                    tb.insert(startTag);
+Line 1099:                    tb.transition(InCell);
+Line 1100:                    tb.insertMarkerToFormattingElements();
+
+
+
+## Suggested fixes:
+This is the list of suggested fixes so far but none of them worked:
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'insertions': [], 'deletions': [], 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'target_lines': [['360', '        clearStackToContext("tbody", "tfoot", "thead");'], ['364', '        clearStackToContext("tr");']], 'insertions': [], 'deletions': [], 'modifications': []}, {'file_name': 'org/jsoup/parser/HtmlTreeBuilderState.java', 'target_lines': [['1036', '                    if (name.equals("tr")) {'], ['1096', '                if (StringUtil.in(name, "th", "td")) {']], 'insertions': [], 'deletions': [], 'modifications': []}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'target_lines': [['360', '        clearStackToContext("tbody", "tfoot", "thead");'], ['364', '        clearStackToContext("tr");']], 'insertions': [], 'deletions': [], 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}, {'file_name': 'org/jsoup/parser/HtmlTreeBuilderState.java', 'target_lines': [['1036', '                    if (name.equals("tr")) {'], ['1096', '                if (StringUtil.in(name, "th", "td")) {']], 'insertions': [], 'deletions': [], 'modifications': [{'line_number': 1036, 'modified_line': '                    if (name.equals("tr")) {'}, {'line_number': 1096, 'modified_line': '                if (StringUtil.in(name, "th", "td")) {'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilderState.java', 'modifications': [{'line_number': 1036, 'modified_line': 'if (name.equals("tr") || StringUtil.in(name, "th", "td")) {'}, {'line_number': 1040, 'modified_line': 'tb.transition(InRow);'}, {'line_number': 1096, 'modified_line': 'if (StringUtil.in(name, "th", "td", "tr")) {'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}, {'file_name': 'org/jsoup/parser/HtmlTreeBuilderState.java', 'modifications': [{'line_number': 1036, 'modified_line': 'if (name.equals("tr") || StringUtil.in(name, "th", "td")) {'}, {'line_number': 1040, 'modified_line': 'tb.transition(InRow);'}, {'line_number': 1096, 'modified_line': 'if (StringUtil.in(name, "th", "td", "tr")) {'}]}]
+
+
+## The list of emplementations of some methods in the code base:
+Command extract_method_code returned: We found the following implementations for the method name clearStackToContext (we give the body of the method):
+### Implementation candidate 0:
+    private void clearStackToContext(String... nodeNames) {
+        for (int pos = stack.size() -1; pos >= 0; pos--) {
+            Element next = stack.get(pos);
+            if (StringUtil.in(next.nodeName(), nodeNames) || next.nodeName().equals("html"))
+                break;
+            else
+                stack.remove(pos);
+        }
+    }
+Command extract_method_code returned: We found the following implementations for the method name clearStackToContext (we give the body of the method):
+### Implementation candidate 0:
+    private void clearStackToContext(String... nodeNames) {
+        for (int pos = stack.size() -1; pos >= 0; pos--) {
+            Element next = stack.get(pos);
+            if (StringUtil.in(next.nodeName(), nodeNames) || next.nodeName().equals("html"))
+                break;
+            else
+                stack.remove(pos);
+        }
+    }
+Command extract_method_code returned: We found the following implementations for the method name clearStackToContext (we give the body of the method):
+### Implementation candidate 0:
+    private void clearStackToContext(String... nodeNames) {
+        for (int pos = stack.size() -1; pos >= 0; pos--) {
+            Element next = stack.get(pos);
+            if (StringUtil.in(next.nodeName(), nodeNames) || next.nodeName().equals("html"))
+                break;
+            else
+                stack.remove(pos);
+        }
+    }
+Command extract_method_code returned: We found the following implementations for the method name process (we give the body of the method):
+### Implementation candidate 0:
+    protected boolean process(Token token) {
+        currentToken = token;
+        return this.state.process(token, this);
+    }
+### Implementation candidate 1:
+    boolean process(Token token, HtmlTreeBuilderState state) {
+        currentToken = token;
+        return state.process(token, this);
+    }
+
+Command extract_method_code returned a lengthy response, we truncated it to the first 4000 characters: We found the following implementations for the method name process (we give the body of the method):
+### Implementation candidate 0:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                // todo: parse error check on expected doctypes
+                // todo: quirk state check on doctype ids
+                Token.Doctype d = t.asDoctype();
+                DocumentType doctype = new DocumentType(
+                    tb.settings.normalizeTag(d.getName()), d.getPublicIdentifier(), d.getSystemIdentifier());
+                doctype.setPubSysKey(d.getPubSysKey());
+                tb.getDocument().appendChild(doctype);
+                if (d.isForceQuirks())
+                    tb.getDocument().quirksMode(Document.QuirksMode.quirks);
+                tb.transition(BeforeHtml);
+            } else {
+                // todo: check not iframe srcdoc
+                tb.transition(BeforeHtml);
+                return tb.process(t); // re-process token
+            }
+            return true;
+        }
+### Implementation candidate 1:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                tb.insert(t.asStartTag());
+                tb.transition(BeforeHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                return anythingElse(t, tb);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                return anythingElse(t, tb);
+            }
+            return true;
+        }
+### Implementation candidate 2:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                return InBody.process(t, tb); // does not transition
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("head")) {
+                Element head = tb.insert(t.asStartTag());
+                tb.setHeadElement(head);
+                tb.transition(InHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                tb.processStartTag("head");
+                return tb.process(t);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                tb.processStartTag("head");
+                return tb.process(t);
+            }
+            return true;
+        }
+### Implementation candidate 3:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                tb.insert(t.asCharacter());
+                return true;
+            }
+            switch (t.type) {
+                case Comment:
+                    tb.insert(t.asComment());
+                    break;
+                case Doctype:
+                    tb.error(this);
+                    return false;
+                case StartTag:
+                    Token.StartTag start = t.asStartTag();
+                    String name = start.normalName();
+                    if (name.equals("html")) {
+                        return InBody.process(t, tb);
+                    }
+Command extract_method_code returned: We found the following implementations for the method name clearStackToTableBodyContext (we give the body of the method):
+### Implementation candidate 0:
+    void clearStackToTableBodyContext() {
+        clearStackToContext("tbody", "tfoot", "thead");
+    }
+
+Command extract_method_code returned: We found the following implementations for the method name clearStackToTableRowContext (we give the body of the method):
+### Implementation candidate 0:
+    void clearStackToTableRowContext() {
+        clearStackToContext("tr");
+    }
+
+Command extract_method_code returned a lengthy response, we truncated it to the first 4000 characters: We found the following implementations for the method name process (we give the body of the method):
+### Implementation candidate 0:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                // todo: parse error check on expected doctypes
+                // todo: quirk state check on doctype ids
+                Token.Doctype d = t.asDoctype();
+                DocumentType doctype = new DocumentType(
+                    tb.settings.normalizeTag(d.getName()), d.getPublicIdentifier(), d.getSystemIdentifier());
+                doctype.setPubSysKey(d.getPubSysKey());
+                tb.getDocument().appendChild(doctype);
+                if (d.isForceQuirks())
+                    tb.getDocument().quirksMode(Document.QuirksMode.quirks);
+                tb.transition(BeforeHtml);
+            } else {
+                // todo: check not iframe srcdoc
+                tb.transition(BeforeHtml);
+                return tb.process(t); // re-process token
+            }
+            return true;
+        }
+### Implementation candidate 1:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                tb.insert(t.asStartTag());
+                tb.transition(BeforeHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                return anythingElse(t, tb);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                return anythingElse(t, tb);
+            }
+            return true;
+        }
+### Implementation candidate 2:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                return InBody.process(t, tb); // does not transition
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("head")) {
+                Element head = tb.insert(t.asStartTag());
+                tb.setHeadElement(head);
+                tb.transition(InHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                tb.processStartTag("head");
+                return tb.process(t);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                tb.processStartTag("head");
+                return tb.process(t);
+            }
+            return true;
+        }
+### Implementation candidate 3:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                tb.insert(t.asCharacter());
+                return true;
+            }
+            switch (t.type) {
+                case Comment:
+                    tb.insert(t.asComment());
+                    break;
+                case Doctype:
+                    tb.error(this);
+                    return false;
+                case StartTag:
+                    Token.StartTag start = t.asStartTag();
+                    String name = start.normalName();
+                    if (name.equals("html")) {
+                        return InBody.process(t, tb);
+                    }
+Command extract_method_code returned a lengthy response, we truncated it to the first 4000 characters: We found the following implementations for the method name process (we give the body of the method):
+### Implementation candidate 0:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                // todo: parse error check on expected doctypes
+                // todo: quirk state check on doctype ids
+                Token.Doctype d = t.asDoctype();
+                DocumentType doctype = new DocumentType(
+                    tb.settings.normalizeTag(d.getName()), d.getPublicIdentifier(), d.getSystemIdentifier());
+                doctype.setPubSysKey(d.getPubSysKey());
+                tb.getDocument().appendChild(doctype);
+                if (d.isForceQuirks())
+                    tb.getDocument().quirksMode(Document.QuirksMode.quirks);
+                tb.transition(BeforeHtml);
+            } else {
+                // todo: check not iframe srcdoc
+                tb.transition(BeforeHtml);
+                return tb.process(t); // re-process token
+            }
+            return true;
+        }
+### Implementation candidate 1:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                tb.insert(t.asStartTag());
+                tb.transition(BeforeHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                return anythingElse(t, tb);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                return anythingElse(t, tb);
+            }
+            return true;
+        }
+### Implementation candidate 2:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                return InBody.process(t, tb); // does not transition
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("head")) {
+                Element head = tb.insert(t.asStartTag());
+                tb.setHeadElement(head);
+                tb.transition(InHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                tb.processStartTag("head");
+                return tb.process(t);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                tb.processStartTag("head");
+                return tb.process(t);
+            }
+            return true;
+        }
+### Implementation candidate 3:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                tb.insert(t.asCharacter());
+                return true;
+            }
+            switch (t.type) {
+                case Comment:
+                    tb.insert(t.asComment());
+                    break;
+                case Doctype:
+                    tb.error(this);
+                    return false;
+                case StartTag:
+                    Token.StartTag start = t.asStartTag();
+                    String name = start.normalName();
+                    if (name.equals("html")) {
+                        return InBody.process(t, tb);
+                    }
+
+## Functions calls extracted based on snippets of code and target files:
+Code snippet: clearStackToContext
+target file: org/jsoup/parser/HtmlTreeBuilder.java
+similar functions calls that were found:
+Command extract_similar_functions_calls returned: Error: expected string or bytes-like object
+
+
+## Executed search queries within the code base:
+Searching keywords: ['clearStackToContext'], returned the following results:
+Command search_code_base returned: The following matches were found:
+{'/workspaces/RepairAgent2/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java': {'HtmlTreeBuilder': {'clearStackToContext': ['clearstacktocontext', 'clearstacktocontext']}}}
+The search also matched the following files names:
+
+Searching keywords: ['clearStackToContext'], returned the following results:
+Command search_code_base returned: The following matches were found:
+{'/workspaces/RepairAgent2/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java': {'HtmlTreeBuilder': {'clearStackToContext': ['clearstacktocontext', 'clearstacktocontext']}}}
+The search also matched the following files names:
+
+Searching keywords: ['process'], returned the following results:
+Command search_code_base returned: The following matches were found:
+{'/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/helper/HttpConnection.java': {'Response': {'processResponseHeaders': ['process', 'process']}}, '/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/TreeBuilder.java': {'TreeBuilder': {'process': ['process', 'process'], 'processStartTag': ['process', 'process'], 'processEndTag': ['process', 'process']}}, '/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/XmlTreeBuilder.java': {'XmlTreeBuilder': {'process': ['process', 'process']}}, '/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java': {'HtmlTreeBuilder': {'process': ['process', 'process']}}}
+The search also matched the following files names: 
+
+
+
+## The format of the fix
+This is the description of the json format in which you should write your fixes (respect this format when calling the commands write_fix and try_fixes):
+The provided format is a list of dictionaries, each representing a set of edits to a specific file. Each dictionary contains the following keys:
+    "file_name": A string indicating the path or name of the file to be modified.
+    "insertions": A list of dictionaries representing insertions in the file. Each insertion dictionary includes:
+        "line_number": An integer indicating the line number where the insertion should occur.
+        "new_lines": A list of strings representing the new lines to be inserted.
+    "deletions": A list of integers representing line numbers to be deleted from the file.
+    "modifications": A list of dictionaries representing modifications in the file. Each modification dictionary includes:
+        "line_number": An integer indicating the line number to be modified.
+        "modified_line": A string representing the modified content for that line.
+Here is an example:
+[
+    # changes in file 1
+    {
+        "file_name": "org/jfree/data/time/Week.java",
+        "insertions": [
+            {
+                "line_number": 175,
+                "new_lines": [
+                    "    // ... new lines to insert ...\n",
+                    "    // ... more new lines ...\n"
+                ]
+            },
+            {
+                "line_number": 180,
+                "new_lines": [
+                    "    // ... additional new lines ...\n"
+                ]
+            }
+        ],
+        "deletions": [179, 183],
+        "modifications": [
+            {
+                "line_number": 179,
+                "modified_line": "    if (dataset == null) {\n"
+            },
+            {
+                "line_number": 185,
+                "modified_line": "    int seriesCount = dataset.getColumnCount();\n"
+            }
+        ]
+    },
+    # changes in file 2
+    {
+        "file_name": "org/jfree/data/time/Day.java",
+        "insertions": [],
+        "deletions": [],
+        "modifications": [
+            {
+                "line_number": 203,
+                "modified_line": "    days = 0\n"
+            },
+            {
+                "line_number": 307,
+                "modified_line": "    super()\n"
+            }
+        ]
+    }
+]Here are some hints that might help you in suggesting good mutations:
+1: Think of mutating comparison operators in a condition, e.g, < to >= and == to !=... Consider all possibilities and combinations even == to >, != to <= ...for example.
+    Original: if x < 10:
+    Fix: if x >= 10:
+- 2: Think of replacing variables with explicit values (when possible) or with close variable names
+    Original: result = add(x, y)
+    Fix: result = add(5, 8)
+    
+    Original: mult = y + 1
+    Fix:  add = z + 1
+- 3: Consider changing some tokens partially, e.g, minXXX to maxXXX startXXX to endXXX, vice versa and so on... (consider all possibilities)
+    Original: start_elements_valid = True
+    Fix: end_elements_valid = True
+- 4: Think of making conditions more complex (by adding 'and' / 'or' operators and the corresponding part) or less complex (by removing some of 'and'/ 'or' parts)
+    Original: if (x > 0 and y < 5):
+    More complex condition: if (x > 0 and y < 5 and z == 10):
+    Less complex condition: if (x > 0):
+- 5: if your patch consists only of adding a comment or modifying a line into a comment, you should discard the patch and try to suggest mutation of the buggy line(s) of code instead
+    Orginal: '// Modify the logic for finding wrap position and padding text here to address the bug'
+    Fix: pos = findWrapperPosition(text, width, start);
+- 6: in some cases you will be required to insert new lines of code, you should consider adding more lines at given location. Usually, the code around the insertion location give you an idea about the lines to insert. Also the type of assertion failure.
+    Example:
+     if (!Double.isNaN(v)) {
+        min = Math.min(minimum, v);
++       max = Math.max(maximum, v); // insertion happened here
+        }
+    if (!Double.isNaN(u)) {
++       minimum = Math.min(min, u);// insertion happened here
+        maximum = Math.max(max, u);
+        }
+- 7: pay attention to the comments and doc string above the buggy code, specifically if any important comments exist above or next to buggy lines.
+    Example:
+    // - verify the header checksum
+    This comment indicates that a verification of the header checksum, which can be done by calling a method dedicated for that.
+- 8: the usual fix of some null pointer exceptions is to add a condition on the variable(s) that can be null.
+    Original: entity.create()
+    Fix: if (entity != null){
+        entity.create()
+    }
+- 9: Do not modify a file by replacing lines with a comment. If you want to delete a line you can add its number to the list of lines to delete.
+Always suggest code and not comments only.
+Example of forbidden fix because it only writes a comment and not actual code:
+    {
+        modifications: [{"line_number": 105, "modified_line": "// need to improve this code"}]
+    }
+- 10: Pay attention the type of variables. The code before and after the buggy lines might give hints of what the type of a variable should be.
+Example:
+    int x = 20;
+    double y = x * x; // x should have been declared as double in the previous line
+- 11: You also should be careful with types in java, especially numerical types.
+For example int * int might produce a double which means it should be stored in double variable
+Another example is int + int would also produce double.
+
+- 12: If the buggy line is a method signature, consider changing the signature of the method. Also, consider checking similar methods or neighboring methods by searching the code base.
+Examples:
+    change private to public or protected and vice-versa
+    change the type of an argument
+    add or remove an argument
+
+Your fix should target all the following lines by at least one edit type (modification, insertion, or deletion):
+360 from file: org/jsoup/parser/HtmlTreeBuilder.java
+364 from file: org/jsoup/parser/HtmlTreeBuilder.java
+1036 from file: org/jsoup/parser/HtmlTreeBuilderState.java
+1096 from file: org/jsoup/parser/HtmlTreeBuilderState.java
+
+Task for assistant:  generate 30 mutants of the target buggy lines. Respect the fix format, only change values (never touch keys). For every mutant generate a full fix dictionary. Put the 30 mutants in a main list.To generate the list of your mutations, fillout the following template multiple time with different variants:
+[{"file_name": "org/jsoup/parser/HtmlTreeBuilder.java", "target_lines": [["360", "        clearStackToContext(\"tbody\", \"tfoot\", \"thead\");"], ["364", "        clearStackToContext(\"tr\");"]], "insertions": [here put the list of insertion dictionaries. DO NOT REPEAT ALREADY EXISTING LINES!: {"line_numbe":..., "new_lines":[...]}, ...], "deletions": [here put the lines number to delete...], "modifications": [here put the list of modification dictionaries {"line_number":..., "modified_line":...}, ...]}, {"file_name": "org/jsoup/parser/HtmlTreeBuilderState.java", "target_lines": [["1036", "                    if (name.equals(\"tr\")) {"], ["1096", "                if (StringUtil.in(name, \"th\", \"td\")) {"]], "insertions": [here put the list of insertion dictionaries. DO NOT REPEAT ALREADY EXISTING LINES!: {"line_numbe":..., "new_lines":[...]}, ...], "deletions": [here put the lines number to delete...], "modifications": [here put the list of modification dictionaries {"line_number":..., "modified_line":...}, ...]}]
+What follows are sections of the most important information that we have gathered so far about the bug.        Make usage of the following information to suggest mutations of fixes:
+## Info about the bug (bug report summary):
+### Bug info:
+Root cause in triggering tests:
+ - org.jsoup.parser.HtmlParserTest::testTemplateInsideTable
+   --> junit.framework.AssertionFailedError
+
+The bug is located at exactly these lines numbers: (the format is file-name#line-number# line-code):
+org/jsoup/parser/HtmlTreeBuilder.java#360#        clearStackToContext("tbody", "tfoot", "thead");
+org/jsoup/parser/HtmlTreeBuilder.java#364#        clearStackToContext("tr");
+org/jsoup/parser/HtmlTreeBuilderState.java#1036#                    if (name.equals("tr")) {
+org/jsoup/parser/HtmlTreeBuilderState.java#1096#                if (StringUtil.in(name, "th", "td")) {
+
+The following is the list of buggy methods:
+org.jsoup.parser.HtmlTreeBuilder.clearStackToTableBodyContext()V,1
+org.jsoup.parser.HtmlTreeBuilder.clearStackToTableRowContext()V,1
+org.jsoup.parser.HtmlTreeBuilderState$14.process(Lorg/jsoup/parser/Token;Lorg/jsoup/parser/HtmlTreeBuilder;)Z,1
+org.jsoup.parser.HtmlTreeBuilderState$13.process(Lorg/jsoup/parser/Token;Lorg/jsoup/parser/HtmlTreeBuilder;)Z,1
+
+### Test cases results:
+There are 1 failing test cases, here is the full log of failing cases:
+--- org.jsoup.parser.HtmlParserTest::testTemplateInsideTable
+junit.framework.AssertionFailedError
+	at org.jsoup.parser.HtmlParserTest.testTemplateInsideTable(HtmlParserTest.java:1045)
+### The code of the failing test cases:
+Extracting test code from file org/jsoup/parser/HtmlParserTest.java returned: Command extract_test_code returned: public void testTemplateInsideTable() throws IOException {
+        File in = ParseTest.getFile("/htmltests/table-polymer-template.html");
+        Document doc = Jsoup.parse(in, "UTF-8");
+        doc.outputSettings().prettyPrint(true);
+
+        Elements templates = doc.body().getElementsByTag("template");
+        for (Element template : templates) {
+            assertTrue(template.childNodes().size() > 1);
+        }
+  }
+}
+
+
+## Read lines:
+Lines 360 to 364 from file: org/jsoup/parser/HtmlTreeBuilder.java
+Command read_range returned: Line 360:        clearStackToContext("tbody", "tfoot", "thead");
+Line 361:    }
+Line 362:
+Line 363:    void clearStackToTableRowContext() {
+Line 364:        clearStackToContext("tr");
+
+Lines 200 to 250 from file: org/jsoup/parser/HtmlTreeBuilder.java
+Command read_range returned: Line 200:            tokeniser.transition(TokeniserState.Data); // handles <script />, otherwise needs breakout steps from script data
+Line 201:            tokeniser.emit(emptyEnd.reset().name(el.tagName()));  // ensure we get out of whatever state we are in. emitted for yielded processing
+Line 202:            return el;
+Line 203:        }
+Line 204:        
+Line 205:        Element el = new Element(Tag.valueOf(startTag.name(), settings), baseUri, settings.normalizeAttributes(startTag.attributes));
+Line 206:        insert(el);
+Line 207:        return el;
+Line 208:    }
+Line 209:
+Line 210:    Element insertStartTag(String startTagName) {
+Line 211:        Element el = new Element(Tag.valueOf(startTagName, settings), baseUri);
+Line 212:        insert(el);
+Line 213:        return el;
+Line 214:    }
+Line 215:
+Line 216:    void insert(Element el) {
+Line 217:        insertNode(el);
+Line 218:        stack.add(el);
+Line 219:    }
+Line 220:
+Line 221:    Element insertEmpty(Token.StartTag startTag) {
+Line 222:        Tag tag = Tag.valueOf(startTag.name(), settings);
+Line 223:        Element el = new Element(tag, baseUri, startTag.attributes);
+Line 224:        insertNode(el);
+Line 225:        if (startTag.isSelfClosing()) {
+Line 226:            if (tag.isKnownTag()) {
+Line 227:                if (!tag.isEmpty())
+Line 228:                    tokeniser.error("Tag cannot be self closing; not a void tag");
+Line 229:            }
+Line 230:            else // unknown tag, remember this is self closing for output
+Line 231:                tag.setSelfClosing();
+Line 232:        }
+Line 233:        return el;
+Line 234:    }
+Line 235:
+Line 236:    FormElement insertForm(Token.StartTag startTag, boolean onStack) {
+Line 237:        Tag tag = Tag.valueOf(startTag.name(), settings);
+Line 238:        FormElement el = new FormElement(tag, baseUri, startTag.attributes);
+Line 239:        setFormElement(el);
+Line 240:        insertNode(el);
+Line 241:        if (onStack)
+Line 242:            stack.add(el);
+Line 243:        return el;
+Line 244:    }
+Line 245:
+Line 246:    void insert(Token.Comment commentToken) {
+Line 247:        Comment comment = new Comment(commentToken.getData());
+Line 248:        insertNode(comment);
+Line 249:    }
+Line 250:
+
+Lines 1030 to 1100 from file: org/jsoup/parser/HtmlTreeBuilderState.java
+Command read_range returned: Line 1030:    InTableBody {
+Line 1031:        boolean process(Token t, HtmlTreeBuilder tb) {
+Line 1032:            switch (t.type) {
+Line 1033:                case StartTag:
+Line 1034:                    Token.StartTag startTag = t.asStartTag();
+Line 1035:                    String name = startTag.normalName();
+Line 1036:                    if (name.equals("tr")) {
+Line 1037:                        tb.clearStackToTableBodyContext();
+Line 1038:                        tb.insert(startTag);
+Line 1039:                        tb.transition(InRow);
+Line 1040:                    } else if (StringUtil.in(name, "th", "td")) {
+Line 1041:                        tb.error(this);
+Line 1042:                        tb.processStartTag("tr");
+Line 1043:                        return tb.process(startTag);
+Line 1044:                    } else if (StringUtil.in(name, "caption", "col", "colgroup", "tbody", "tfoot", "thead")) {
+Line 1045:                        return exitTableBody(t, tb);
+Line 1046:                    } else
+Line 1047:                        return anythingElse(t, tb);
+Line 1048:                    break;
+Line 1049:                case EndTag:
+Line 1050:                    Token.EndTag endTag = t.asEndTag();
+Line 1051:                    name = endTag.normalName();
+Line 1052:                    if (StringUtil.in(name, "tbody", "tfoot", "thead")) {
+Line 1053:                        if (!tb.inTableScope(name)) {
+Line 1054:                            tb.error(this);
+Line 1055:                            return false;
+Line 1056:                        } else {
+Line 1057:                            tb.clearStackToTableBodyContext();
+Line 1058:                            tb.pop();
+Line 1059:                            tb.transition(InTable);
+Line 1060:                        }
+Line 1061:                    } else if (name.equals("table")) {
+Line 1062:                        return exitTableBody(t, tb);
+Line 1063:                    } else if (StringUtil.in(name, "body", "caption", "col", "colgroup", "html", "td", "th", "tr")) {
+Line 1064:                        tb.error(this);
+Line 1065:                        return false;
+Line 1066:                    } else
+Line 1067:                        return anythingElse(t, tb);
+Line 1068:                    break;
+Line 1069:                default:
+Line 1070:                    return anythingElse(t, tb);
+Line 1071:            }
+Line 1072:            return true;
+Line 1073:        }
+Line 1074:
+Line 1075:        private boolean exitTableBody(Token t, HtmlTreeBuilder tb) {
+Line 1076:            if (!(tb.inTableScope("tbody") || tb.inTableScope("thead") || tb.inScope("tfoot"))) {
+Line 1077:                // frag case
+Line 1078:                tb.error(this);
+Line 1079:                return false;
+Line 1080:            }
+Line 1081:            tb.clearStackToTableBodyContext();
+Line 1082:            tb.processEndTag(tb.currentElement().nodeName()); // tbody, tfoot, thead
+Line 1083:            return tb.process(t);
+Line 1084:        }
+Line 1085:
+Line 1086:        private boolean anythingElse(Token t, HtmlTreeBuilder tb) {
+Line 1087:            return tb.process(t, InTable);
+Line 1088:        }
+Line 1089:    },
+Line 1090:    InRow {
+Line 1091:        boolean process(Token t, HtmlTreeBuilder tb) {
+Line 1092:            if (t.isStartTag()) {
+Line 1093:                Token.StartTag startTag = t.asStartTag();
+Line 1094:                String name = startTag.normalName();
+Line 1095:
+Line 1096:                if (StringUtil.in(name, "th", "td")) {
+Line 1097:                    tb.clearStackToTableRowContext();
+Line 1098:                    tb.insert(startTag);
+Line 1099:                    tb.transition(InCell);
+Line 1100:                    tb.insertMarkerToFormattingElements();
+
+
+
+## Suggested fixes:
+This is the list of suggested fixes so far but none of them worked:
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'insertions': [], 'deletions': [], 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'target_lines': [['360', '        clearStackToContext("tbody", "tfoot", "thead");'], ['364', '        clearStackToContext("tr");']], 'insertions': [], 'deletions': [], 'modifications': []}, {'file_name': 'org/jsoup/parser/HtmlTreeBuilderState.java', 'target_lines': [['1036', '                    if (name.equals("tr")) {'], ['1096', '                if (StringUtil.in(name, "th", "td")) {']], 'insertions': [], 'deletions': [], 'modifications': []}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'target_lines': [['360', '        clearStackToContext("tbody", "tfoot", "thead");'], ['364', '        clearStackToContext("tr");']], 'insertions': [], 'deletions': [], 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}, {'file_name': 'org/jsoup/parser/HtmlTreeBuilderState.java', 'target_lines': [['1036', '                    if (name.equals("tr")) {'], ['1096', '                if (StringUtil.in(name, "th", "td")) {']], 'insertions': [], 'deletions': [], 'modifications': [{'line_number': 1036, 'modified_line': '                    if (name.equals("tr")) {'}, {'line_number': 1096, 'modified_line': '                if (StringUtil.in(name, "th", "td")) {'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilderState.java', 'modifications': [{'line_number': 1036, 'modified_line': 'if (name.equals("tr") || StringUtil.in(name, "th", "td")) {'}, {'line_number': 1040, 'modified_line': 'tb.transition(InRow);'}, {'line_number': 1096, 'modified_line': 'if (StringUtil.in(name, "th", "td", "tr")) {'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilder.java', 'modifications': [{'line_number': 360, 'modified_line': '        clearStackToContext("tbody", "tfoot", "thead", "tr");'}, {'line_number': 364, 'modified_line': '        clearStackToContext("tr");'}]}, {'file_name': 'org/jsoup/parser/HtmlTreeBuilderState.java', 'modifications': [{'line_number': 1036, 'modified_line': 'if (name.equals("tr") || StringUtil.in(name, "th", "td")) {'}, {'line_number': 1040, 'modified_line': 'tb.transition(InRow);'}, {'line_number': 1096, 'modified_line': 'if (StringUtil.in(name, "th", "td", "tr")) {'}]}]
+
+###Fix:
+[{'file_name': 'org/jsoup/parser/HtmlTreeBuilderState.java', 'modifications': [{'line_number': 1036, 'modified_line': 'if (name.equals("tr") || StringUtil.in(name, "th", "td")) {'}, {'line_number': 1040, 'modified_line': 'tb.transition(InRow);'}, {'line_number': 1096, 'modified_line': 'if (StringUtil.in(name, "th", "td", "tr")) {'}]}]
+
+
+## The list of emplementations of some methods in the code base:
+Command extract_method_code returned: We found the following implementations for the method name clearStackToContext (we give the body of the method):
+### Implementation candidate 0:
+    private void clearStackToContext(String... nodeNames) {
+        for (int pos = stack.size() -1; pos >= 0; pos--) {
+            Element next = stack.get(pos);
+            if (StringUtil.in(next.nodeName(), nodeNames) || next.nodeName().equals("html"))
+                break;
+            else
+                stack.remove(pos);
+        }
+    }
+Command extract_method_code returned: We found the following implementations for the method name clearStackToContext (we give the body of the method):
+### Implementation candidate 0:
+    private void clearStackToContext(String... nodeNames) {
+        for (int pos = stack.size() -1; pos >= 0; pos--) {
+            Element next = stack.get(pos);
+            if (StringUtil.in(next.nodeName(), nodeNames) || next.nodeName().equals("html"))
+                break;
+            else
+                stack.remove(pos);
+        }
+    }
+Command extract_method_code returned: We found the following implementations for the method name clearStackToContext (we give the body of the method):
+### Implementation candidate 0:
+    private void clearStackToContext(String... nodeNames) {
+        for (int pos = stack.size() -1; pos >= 0; pos--) {
+            Element next = stack.get(pos);
+            if (StringUtil.in(next.nodeName(), nodeNames) || next.nodeName().equals("html"))
+                break;
+            else
+                stack.remove(pos);
+        }
+    }
+Command extract_method_code returned: We found the following implementations for the method name process (we give the body of the method):
+### Implementation candidate 0:
+    protected boolean process(Token token) {
+        currentToken = token;
+        return this.state.process(token, this);
+    }
+### Implementation candidate 1:
+    boolean process(Token token, HtmlTreeBuilderState state) {
+        currentToken = token;
+        return state.process(token, this);
+    }
+
+Command extract_method_code returned a lengthy response, we truncated it to the first 4000 characters: We found the following implementations for the method name process (we give the body of the method):
+### Implementation candidate 0:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                // todo: parse error check on expected doctypes
+                // todo: quirk state check on doctype ids
+                Token.Doctype d = t.asDoctype();
+                DocumentType doctype = new DocumentType(
+                    tb.settings.normalizeTag(d.getName()), d.getPublicIdentifier(), d.getSystemIdentifier());
+                doctype.setPubSysKey(d.getPubSysKey());
+                tb.getDocument().appendChild(doctype);
+                if (d.isForceQuirks())
+                    tb.getDocument().quirksMode(Document.QuirksMode.quirks);
+                tb.transition(BeforeHtml);
+            } else {
+                // todo: check not iframe srcdoc
+                tb.transition(BeforeHtml);
+                return tb.process(t); // re-process token
+            }
+            return true;
+        }
+### Implementation candidate 1:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                tb.insert(t.asStartTag());
+                tb.transition(BeforeHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                return anythingElse(t, tb);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                return anythingElse(t, tb);
+            }
+            return true;
+        }
+### Implementation candidate 2:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                return InBody.process(t, tb); // does not transition
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("head")) {
+                Element head = tb.insert(t.asStartTag());
+                tb.setHeadElement(head);
+                tb.transition(InHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                tb.processStartTag("head");
+                return tb.process(t);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                tb.processStartTag("head");
+                return tb.process(t);
+            }
+            return true;
+        }
+### Implementation candidate 3:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                tb.insert(t.asCharacter());
+                return true;
+            }
+            switch (t.type) {
+                case Comment:
+                    tb.insert(t.asComment());
+                    break;
+                case Doctype:
+                    tb.error(this);
+                    return false;
+                case StartTag:
+                    Token.StartTag start = t.asStartTag();
+                    String name = start.normalName();
+                    if (name.equals("html")) {
+                        return InBody.process(t, tb);
+                    }
+Command extract_method_code returned: We found the following implementations for the method name clearStackToTableBodyContext (we give the body of the method):
+### Implementation candidate 0:
+    void clearStackToTableBodyContext() {
+        clearStackToContext("tbody", "tfoot", "thead");
+    }
+
+Command extract_method_code returned: We found the following implementations for the method name clearStackToTableRowContext (we give the body of the method):
+### Implementation candidate 0:
+    void clearStackToTableRowContext() {
+        clearStackToContext("tr");
+    }
+
+Command extract_method_code returned a lengthy response, we truncated it to the first 4000 characters: We found the following implementations for the method name process (we give the body of the method):
+### Implementation candidate 0:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                // todo: parse error check on expected doctypes
+                // todo: quirk state check on doctype ids
+                Token.Doctype d = t.asDoctype();
+                DocumentType doctype = new DocumentType(
+                    tb.settings.normalizeTag(d.getName()), d.getPublicIdentifier(), d.getSystemIdentifier());
+                doctype.setPubSysKey(d.getPubSysKey());
+                tb.getDocument().appendChild(doctype);
+                if (d.isForceQuirks())
+                    tb.getDocument().quirksMode(Document.QuirksMode.quirks);
+                tb.transition(BeforeHtml);
+            } else {
+                // todo: check not iframe srcdoc
+                tb.transition(BeforeHtml);
+                return tb.process(t); // re-process token
+            }
+            return true;
+        }
+### Implementation candidate 1:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                tb.insert(t.asStartTag());
+                tb.transition(BeforeHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                return anythingElse(t, tb);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                return anythingElse(t, tb);
+            }
+            return true;
+        }
+### Implementation candidate 2:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                return InBody.process(t, tb); // does not transition
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("head")) {
+                Element head = tb.insert(t.asStartTag());
+                tb.setHeadElement(head);
+                tb.transition(InHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                tb.processStartTag("head");
+                return tb.process(t);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                tb.processStartTag("head");
+                return tb.process(t);
+            }
+            return true;
+        }
+### Implementation candidate 3:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                tb.insert(t.asCharacter());
+                return true;
+            }
+            switch (t.type) {
+                case Comment:
+                    tb.insert(t.asComment());
+                    break;
+                case Doctype:
+                    tb.error(this);
+                    return false;
+                case StartTag:
+                    Token.StartTag start = t.asStartTag();
+                    String name = start.normalName();
+                    if (name.equals("html")) {
+                        return InBody.process(t, tb);
+                    }
+Command extract_method_code returned a lengthy response, we truncated it to the first 4000 characters: We found the following implementations for the method name process (we give the body of the method):
+### Implementation candidate 0:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                // todo: parse error check on expected doctypes
+                // todo: quirk state check on doctype ids
+                Token.Doctype d = t.asDoctype();
+                DocumentType doctype = new DocumentType(
+                    tb.settings.normalizeTag(d.getName()), d.getPublicIdentifier(), d.getSystemIdentifier());
+                doctype.setPubSysKey(d.getPubSysKey());
+                tb.getDocument().appendChild(doctype);
+                if (d.isForceQuirks())
+                    tb.getDocument().quirksMode(Document.QuirksMode.quirks);
+                tb.transition(BeforeHtml);
+            } else {
+                // todo: check not iframe srcdoc
+                tb.transition(BeforeHtml);
+                return tb.process(t); // re-process token
+            }
+            return true;
+        }
+### Implementation candidate 1:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (isWhitespace(t)) {
+                return true; // ignore whitespace
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                tb.insert(t.asStartTag());
+                tb.transition(BeforeHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                return anythingElse(t, tb);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                return anythingElse(t, tb);
+            }
+            return true;
+        }
+### Implementation candidate 2:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                return true;
+            } else if (t.isComment()) {
+                tb.insert(t.asComment());
+            } else if (t.isDoctype()) {
+                tb.error(this);
+                return false;
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("html")) {
+                return InBody.process(t, tb); // does not transition
+            } else if (t.isStartTag() && t.asStartTag().normalName().equals("head")) {
+                Element head = tb.insert(t.asStartTag());
+                tb.setHeadElement(head);
+                tb.transition(InHead);
+            } else if (t.isEndTag() && (StringUtil.in(t.asEndTag().normalName(), "head", "body", "html", "br"))) {
+                tb.processStartTag("head");
+                return tb.process(t);
+            } else if (t.isEndTag()) {
+                tb.error(this);
+                return false;
+            } else {
+                tb.processStartTag("head");
+                return tb.process(t);
+            }
+            return true;
+        }
+### Implementation candidate 3:
+        boolean process(Token t, HtmlTreeBuilder tb) {
+            if (isWhitespace(t)) {
+                tb.insert(t.asCharacter());
+                return true;
+            }
+            switch (t.type) {
+                case Comment:
+                    tb.insert(t.asComment());
+                    break;
+                case Doctype:
+                    tb.error(this);
+                    return false;
+                case StartTag:
+                    Token.StartTag start = t.asStartTag();
+                    String name = start.normalName();
+                    if (name.equals("html")) {
+                        return InBody.process(t, tb);
+                    }
+
+## Functions calls extracted based on snippets of code and target files:
+Code snippet: clearStackToContext
+target file: org/jsoup/parser/HtmlTreeBuilder.java
+similar functions calls that were found:
+Command extract_similar_functions_calls returned: Error: expected string or bytes-like object
+
+
+## Executed search queries within the code base:
+Searching keywords: ['clearStackToContext'], returned the following results:
+Command search_code_base returned: The following matches were found:
+{'/workspaces/RepairAgent2/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java': {'HtmlTreeBuilder': {'clearStackToContext': ['clearstacktocontext', 'clearstacktocontext']}}}
+The search also matched the following files names:
+
+Searching keywords: ['clearStackToContext'], returned the following results:
+Command search_code_base returned: The following matches were found:
+{'/workspaces/RepairAgent2/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java': {'HtmlTreeBuilder': {'clearStackToContext': ['clearstacktocontext', 'clearstacktocontext']}}}
+The search also matched the following files names:
+
+Searching keywords: ['process'], returned the following results:
+Command search_code_base returned: The following matches were found:
+{'/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/helper/HttpConnection.java': {'Response': {'processResponseHeaders': ['process', 'process']}}, '/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/TreeBuilder.java': {'TreeBuilder': {'process': ['process', 'process'], 'processStartTag': ['process', 'process'], 'processEndTag': ['process', 'process']}}, '/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/XmlTreeBuilder.java': {'XmlTreeBuilder': {'process': ['process', 'process']}}, '/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/jsoup_65_buggy/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java': {'HtmlTreeBuilder': {'process': ['process', 'process']}}}
+The search also matched the following files names: 
+
+
+
+## The format of the fix
+This is the description of the json format in which you should write your fixes (respect this format when calling the commands write_fix and try_fixes):
+The provided format is a list of dictionaries, each representing a set of edits to a specific file. Each dictionary contains the following keys:
+    "file_name": A string indicating the path or name of the file to be modified.
+    "insertions": A list of dictionaries representing insertions in the file. Each insertion dictionary includes:
+        "line_number": An integer indicating the line number where the insertion should occur.
+        "new_lines": A list of strings representing the new lines to be inserted.
+    "deletions": A list of integers representing line numbers to be deleted from the file.
+    "modifications": A list of dictionaries representing modifications in the file. Each modification dictionary includes:
+        "line_number": An integer indicating the line number to be modified.
+        "modified_line": A string representing the modified content for that line.
+Here is an example:
+[
+    # changes in file 1
+    {
+        "file_name": "org/jfree/data/time/Week.java",
+        "insertions": [
+            {
+                "line_number": 175,
+                "new_lines": [
+                    "    // ... new lines to insert ...\n",
+                    "    // ... more new lines ...\n"
+                ]
+            },
+            {
+                "line_number": 180,
+                "new_lines": [
+                    "    // ... additional new lines ...\n"
+                ]
+            }
+        ],
+        "deletions": [179, 183],
+        "modifications": [
+            {
+                "line_number": 179,
+                "modified_line": "    if (dataset == null) {\n"
+            },
+            {
+                "line_number": 185,
+                "modified_line": "    int seriesCount = dataset.getColumnCount();\n"
+            }
+        ]
+    },
+    # changes in file 2
+    {
+        "file_name": "org/jfree/data/time/Day.java",
+        "insertions": [],
+        "deletions": [],
+        "modifications": [
+            {
+                "line_number": 203,
+                "modified_line": "    days = 0\n"
+            },
+            {
+                "line_number": 307,
+                "modified_line": "    super()\n"
+            }
+        ]
+    }
+]Here are some hints that might help you in suggesting good mutations:
+1: Think of mutating comparison operators in a condition, e.g, < to >= and == to !=... Consider all possibilities and combinations even == to >, != to <= ...for example.
+    Original: if x < 10:
+    Fix: if x >= 10:
+- 2: Think of replacing variables with explicit values (when possible) or with close variable names
+    Original: result = add(x, y)
+    Fix: result = add(5, 8)
+    
+    Original: mult = y + 1
+    Fix:  add = z + 1
+- 3: Consider changing some tokens partially, e.g, minXXX to maxXXX startXXX to endXXX, vice versa and so on... (consider all possibilities)
+    Original: start_elements_valid = True
+    Fix: end_elements_valid = True
+- 4: Think of making conditions more complex (by adding 'and' / 'or' operators and the corresponding part) or less complex (by removing some of 'and'/ 'or' parts)
+    Original: if (x > 0 and y < 5):
+    More complex condition: if (x > 0 and y < 5 and z == 10):
+    Less complex condition: if (x > 0):
+- 5: if your patch consists only of adding a comment or modifying a line into a comment, you should discard the patch and try to suggest mutation of the buggy line(s) of code instead
+    Orginal: '// Modify the logic for finding wrap position and padding text here to address the bug'
+    Fix: pos = findWrapperPosition(text, width, start);
+- 6: in some cases you will be required to insert new lines of code, you should consider adding more lines at given location. Usually, the code around the insertion location give you an idea about the lines to insert. Also the type of assertion failure.
+    Example:
+     if (!Double.isNaN(v)) {
+        min = Math.min(minimum, v);
++       max = Math.max(maximum, v); // insertion happened here
+        }
+    if (!Double.isNaN(u)) {
++       minimum = Math.min(min, u);// insertion happened here
+        maximum = Math.max(max, u);
+        }
+- 7: pay attention to the comments and doc string above the buggy code, specifically if any important comments exist above or next to buggy lines.
+    Example:
+    // - verify the header checksum
+    This comment indicates that a verification of the header checksum, which can be done by calling a method dedicated for that.
+- 8: the usual fix of some null pointer exceptions is to add a condition on the variable(s) that can be null.
+    Original: entity.create()
+    Fix: if (entity != null){
+        entity.create()
+    }
+- 9: Do not modify a file by replacing lines with a comment. If you want to delete a line you can add its number to the list of lines to delete.
+Always suggest code and not comments only.
+Example of forbidden fix because it only writes a comment and not actual code:
+    {
+        modifications: [{"line_number": 105, "modified_line": "// need to improve this code"}]
+    }
+- 10: Pay attention the type of variables. The code before and after the buggy lines might give hints of what the type of a variable should be.
+Example:
+    int x = 20;
+    double y = x * x; // x should have been declared as double in the previous line
+- 11: You also should be careful with types in java, especially numerical types.
+For example int * int might produce a double which means it should be stored in double variable
+Another example is int + int would also produce double.
+
+- 12: If the buggy line is a method signature, consider changing the signature of the method. Also, consider checking similar methods or neighboring methods by searching the code base.
+Examples:
+    change private to public or protected and vice-versa
+    change the type of an argument
+    add or remove an argument
+
+Your fix should target all the following lines by at least one edit type (modification, insertion, or deletion):
+360 from file: org/jsoup/parser/HtmlTreeBuilder.java
+364 from file: org/jsoup/parser/HtmlTreeBuilder.java
+1036 from file: org/jsoup/parser/HtmlTreeBuilderState.java
+1096 from file: org/jsoup/parser/HtmlTreeBuilderState.java
+
+Task for assistant:  generate 30 mutants of the target buggy lines. Respect the fix format, only change values (never touch keys). For every mutant generate a full fix dictionary. Put the 30 mutants in a main list.To generate the list of your mutations, fillout the following template multiple time with different variants:
+[{"file_name": "org/jsoup/parser/HtmlTreeBuilder.java", "target_lines": [["360", "        clearStackToContext(\"tbody\", \"tfoot\", \"thead\");"], ["364", "        clearStackToContext(\"tr\");"]], "insertions": [here put the list of insertion dictionaries. DO NOT REPEAT ALREADY EXISTING LINES!: {"line_numbe":..., "new_lines":[...]}, ...], "deletions": [here put the lines number to delete...], "modifications": [here put the list of modification dictionaries {"line_number":..., "modified_line":...}, ...]}, {"file_name": "org/jsoup/parser/HtmlTreeBuilderState.java", "target_lines": [["1036", "                    if (name.equals(\"tr\")) {"], ["1096", "                if (StringUtil.in(name, \"th\", \"td\")) {"]], "insertions": [here put the list of insertion dictionaries. DO NOT REPEAT ALREADY EXISTING LINES!: {"line_numbe":..., "new_lines":[...]}, ...], "deletions": [here put the lines number to delete...], "modifications": [here put the list of modification dictionaries {"line_number":..., "modified_line":...}, ...]}]
