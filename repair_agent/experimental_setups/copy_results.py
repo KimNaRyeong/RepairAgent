@@ -56,7 +56,7 @@ for bug_name in bugs_list_hotswap_fold_rerurn:
 with open(bugs_list_hotswap_fold_file, 'r') as f:
     bugs_list_hotswap_fold = f.read().split('\n\n')
 
-for i in range(13, 14):
+for i in range(11, 14):
     source_base_dir = f'/workspaces/RepairAgent/repair_agent/experimental_setups/hotswap_gpt-4o_experiment_{i}'
     dest_base_dir = f'/workspaces/RepairAgent/repair_agent/experimental_setups/hotswap_gpt-4o_experiment_{i-3}'
     for bug_name in bugs_list_hotswap_fold:
