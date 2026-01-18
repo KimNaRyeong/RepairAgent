@@ -1,0 +1,637 @@
+```json
+{
+  "thoughts": "The getRegistry method simply returns the current value of the REGISTRY ThreadLocal variable. This confirms that the issue might be related to how the REGISTRY is being managed, particularly in the context of the testReflectionObjectCycle test case. Since the REGISTRY is expected to be null after the hashCode method is called, it suggests that the registry is not being cleared properly. I should now examine the unregister method to ensure it properly clears the registry.",
+  "command": {
+    "name": "extract_method_code",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "filepath": "/workspaces/RepairAgent/repair_agent/auto_gpt_workspace/lang_32_buggy/src/main/java/org/apache/commons/lang3/builder/HashCodeBuilder.java",
+      "method_name": "unregister"
+    }
+  }
+}
+``````json
+{
+  "thoughts": "The unregister method removes an IDKey from the registry, but it does not clear the registry entirely. This could be the reason why the registry is not null after the hashCode method is called in the testReflectionObjectCycle test case. To fix this, I should modify the unregister method to clear the registry when it becomes empty after removing an IDKey.",
+  "command": {
+    "name": "write_fix",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "changes_dicts": [
+        {
+          "file_name": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+          "insertions": [],
+          "deletions": [],
+          "modifications": [
+            {
+              "line_number": 538,
+              "modified_line": "getRegistry().remove(new IDKey(value));\nif (getRegistry().isEmpty()) {\n    REGISTRY.remove();\n}"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+``````json
+{
+  "thoughts": "The previous fix only addressed the unregister method. However, the bug report indicates that there are multiple lines involved in the bug, including the initialization of the REGISTRY and the isRegistered method. I will modify the initialization of the REGISTRY to use ThreadLocal.withInitial, and ensure that the isRegistered method handles null cases properly. Additionally, I will ensure that the registry is cleared when it becomes empty.",
+  "command": {
+    "name": "write_fix",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "changes_dicts": [
+        {
+          "file_name": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+          "target_lines": [
+            ["104", "    private static final ThreadLocal<Set<IDKey>> REGISTRY = new ThreadLocal<Set<IDKey>>() {"],
+            ["105", "        @Override"],
+            ["106", "        protected Set<IDKey> initialValue() {"],
+            ["107", "            return new HashSet<IDKey>();"],
+            ["108", "        }"],
+            ["109", "    };"],
+            ["152", "        return getRegistry().contains(new IDKey(value));"],
+            ["538", "        getRegistry().remove(new IDKey(value));"],
+            ["522", "FAULT_OF_OMISSION"]
+          ],
+          "insertions": [],
+          "deletions": [],
+          "modifications": [
+            {
+              "line_number": 104,
+              "modified_line": "    private static final ThreadLocal<Set<IDKey>> REGISTRY = ThreadLocal.withInitial(HashSet::new);"
+            },
+            {
+              "line_number": 152,
+              "modified_line": "        Set<IDKey> registry = getRegistry();\n        return registry != null && registry.contains(new IDKey(value));"
+            },
+            {
+              "line_number": 538,
+              "modified_line": "        Set<IDKey> registry = getRegistry();\n        if (registry != null) {\n            registry.remove(new IDKey(value));\n            if (registry.isEmpty()) {\n                REGISTRY.remove();\n            }\n        }"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+``````json
+{
+  "thoughts": "I need to address all the buggy lines, including the initialization of the REGISTRY, the isRegistered method, and the unregister method. Additionally, I need to handle the FAULT_OF_OMISSION at line 522 by ensuring proper cleanup of the registry.",
+  "command": {
+    "name": "write_fix",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "changes_dicts": [
+        {
+          "file_name": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+          "target_lines": [
+            ["104", "    private static final ThreadLocal<Set<IDKey>> REGISTRY = new ThreadLocal<Set<IDKey>>() {"],
+            ["105", "        @Override"],
+            ["106", "        protected Set<IDKey> initialValue() {"],
+            ["107", "            return new HashSet<IDKey>();"],
+            ["108", "        }"],
+            ["109", "    };"],
+            ["152", "        return getRegistry().contains(new IDKey(value));"],
+            ["538", "        getRegistry().remove(new IDKey(value));"],
+            ["522", "FAULT_OF_OMISSION"]
+          ],
+          "insertions": [
+            {
+              "line_number": 522,
+              "new_lines": [
+                "// Ensure the registry is cleared when empty",
+                "if (getRegistry().isEmpty()) {",
+                "    REGISTRY.remove();",
+                "}"
+              ]
+            }
+          ],
+          "deletions": [],
+          "modifications": [
+            {
+              "line_number": 104,
+              "modified_line": "    private static final ThreadLocal<Set<IDKey>> REGISTRY = ThreadLocal.withInitial(HashSet::new);"
+            },
+            {
+              "line_number": 152,
+              "modified_line": "        Set<IDKey> registry = getRegistry();\n        return registry != null && registry.contains(new IDKey(value));"
+            },
+            {
+              "line_number": 538,
+              "modified_line": "        Set<IDKey> registry = getRegistry();\n        if (registry != null) {\n            registry.remove(new IDKey(value));\n            if (registry.isEmpty()) {\n                REGISTRY.remove();\n            }\n        }"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+``````json
+{
+  "thoughts": "I need to gather more information about the methods and classes in the file to ensure I address all the buggy lines correctly. This will help me understand the context and dependencies better.",
+  "command": {
+    "name": "get_classes_and_methods",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "file_path": "org/apache/commons/lang3/builder/HashCodeBuilder.java"
+    }
+  }
+}
+``````json
+{
+  "thoughts": "The methods in the HashCodeBuilder class include getRegistry, isRegistered, register, and unregister, which are directly related to the bug. I need to examine the register method to understand how objects are added to the REGISTRY, as this might be related to the issue of the registry not being cleared properly.",
+  "command": {
+    "name": "extract_method_code",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "filepath": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+      "method_name": "register"
+    }
+  }
+}
+``````json
+{
+  "thoughts": "The register method adds an IDKey of the given object to the registry. The issue might be that the registry is not being cleared properly after use, which could lead to unexpected behavior in the test case. I will now examine the unregister method to see how objects are removed from the registry, as this might provide insight into why the registry is not being cleared.",
+  "command": {
+    "name": "extract_method_code",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "filepath": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+      "method_name": "unregister"
+    }
+  }
+}
+``````json
+{
+  "thoughts": "The unregister method removes an IDKey from the registry, but it does not check if the registry is empty afterward. This could lead to the registry not being cleared properly. I will now examine the register method to understand how objects are added to the registry and see if there is any inconsistency in how the registry is managed.",
+  "command": {
+    "name": "extract_method_code",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "filepath": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+      "method_name": "register"
+    }
+  }
+}
+``````json
+{
+  "thoughts": "The register method simply adds an IDKey to the registry without any checks. This is consistent with the behavior of a typical registry. However, the issue might be with how the registry is being managed after removals. I will now check the usage of the getRegistry method to see if there are any inconsistencies or missing checks when accessing the registry.",
+  "command": {
+    "name": "extract_similar_functions_calls",
+    "args": {
+      "project_name": "lang",
+      "bug_index": "32",
+      "file_path": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+      "code_snippet": "getRegistry()"
+    }
+  }
+}
+``````json
+{
+  "thoughts": "The previous attempts to fix the bug involved modifying the registry management, particularly ensuring that the registry is cleared when empty. However, these fixes did not resolve the issue. I will now explore the possibility of modifying the initial value of the ThreadLocal registry to return null when empty, which might align with the expected behavior in the test case.",
+  "command": {
+    "name": "write_fix",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "changes_dicts": [
+        {
+          "file_name": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+          "insertions": [],
+          "deletions": [],
+          "modifications": [
+            {
+              "line_number": 106,
+              "modified_line": "protected Set<IDKey> initialValue() { return null; }"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+``````json
+{
+  "thoughts": "The previous fix did not address all the buggy lines. I will now modify the initial value of the ThreadLocal registry to return null and ensure that the registry is cleared when empty. This should address the issues in lines 104-109, 152, and 538. Additionally, I will handle the FAULT_OF_OMISSION at line 522 by ensuring the registry is cleared when empty.",
+  "command": {
+    "name": "write_fix",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "changes_dicts": [
+        {
+          "file_name": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+          "target_lines": [
+            ["104", "    private static final ThreadLocal<Set<IDKey>> REGISTRY = new ThreadLocal<Set<IDKey>>() {"],
+            ["105", "        @Override"],
+            ["106", "        protected Set<IDKey> initialValue() {"],
+            ["107", "            return new HashSet<IDKey>();"],
+            ["108", "        }"],
+            ["109", "    };"],
+            ["152", "        return getRegistry().contains(new IDKey(value));"],
+            ["538", "        getRegistry().remove(new IDKey(value));"],
+            ["522", "FAULT_OF_OMISSION"]
+          ],
+          "insertions": [
+            {
+              "line_number": 522,
+              "new_lines": [
+                "// Ensure the registry is cleared when empty",
+                "if (getRegistry() != null && getRegistry().isEmpty()) {",
+                "    REGISTRY.remove();",
+                "}"
+              ]
+            }
+          ],
+          "deletions": [],
+          "modifications": [
+            {
+              "line_number": 106,
+              "modified_line": "protected Set<IDKey> initialValue() { return null; }"
+            },
+            {
+              "line_number": 152,
+              "modified_line": "Set<IDKey> registry = getRegistry(); return registry != null && registry.contains(new IDKey(value));"
+            },
+            {
+              "line_number": 538,
+              "modified_line": "Set<IDKey> registry = getRegistry(); if (registry != null) { registry.remove(new IDKey(value)); if (registry.isEmpty()) { REGISTRY.remove(); } }"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+``````json
+{
+  "thoughts": "I will address all the buggy lines by modifying the initial value of the ThreadLocal registry to return null, ensuring the registry is cleared when empty, and handling the FAULT_OF_OMISSION at line 522. This will involve modifying lines 104-109, 152, and 538, and inserting code at line 522.",
+  "command": {
+    "name": "write_fix",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "changes_dicts": [
+        {
+          "file_name": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+          "target_lines": [
+            ["104", "    private static final ThreadLocal<Set<IDKey>> REGISTRY = new ThreadLocal<Set<IDKey>>() {"],
+            ["105", "        @Override"],
+            ["106", "        protected Set<IDKey> initialValue() {"],
+            ["107", "            return new HashSet<IDKey>();"],
+            ["108", "        }"],
+            ["109", "    };"],
+            ["152", "        return getRegistry().contains(new IDKey(value));"],
+            ["538", "        getRegistry().remove(new IDKey(value));"],
+            ["522", "FAULT_OF_OMISSION"]
+          ],
+          "insertions": [
+            {
+              "line_number": 522,
+              "new_lines": [
+                "// Ensure the registry is cleared when empty",
+                "if (getRegistry() != null && getRegistry().isEmpty()) {",
+                "    REGISTRY.remove();",
+                "}"
+              ]
+            }
+          ],
+          "deletions": [],
+          "modifications": [
+            {
+              "line_number": 104,
+              "modified_line": "private static final ThreadLocal<Set<IDKey>> REGISTRY = ThreadLocal.withInitial(() -> null);"
+            },
+            {
+              "line_number": 152,
+              "modified_line": "Set<IDKey> registry = getRegistry(); return registry != null && registry.contains(new IDKey(value));"
+            },
+            {
+              "line_number": 538,
+              "modified_line": "Set<IDKey> registry = getRegistry(); if (registry != null) { registry.remove(new IDKey(value)); if (registry.isEmpty()) { REGISTRY.remove(); } }"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+``````json
+{
+  "thoughts": "I will address all the buggy lines by modifying the initial value of the ThreadLocal registry to return null, ensuring the registry is cleared when empty, and handling the FAULT_OF_OMISSION at line 522. This will involve modifying lines 104-109, 152, and 538, and inserting code at line 522.",
+  "command": {
+    "name": "write_fix",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "changes_dicts": [
+        {
+          "file_name": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+          "target_lines": [
+            ["104", "    private static final ThreadLocal<Set<IDKey>> REGISTRY = new ThreadLocal<Set<IDKey>>() {"],
+            ["105", "        @Override"],
+            ["106", "        protected Set<IDKey> initialValue() {"],
+            ["107", "            return new HashSet<IDKey>();"],
+            ["108", "        }"],
+            ["109", "    };"],
+            ["152", "        return getRegistry().contains(new IDKey(value));"],
+            ["538", "        getRegistry().remove(new IDKey(value));"],
+            ["522", "FAULT_OF_OMISSION"]
+          ],
+          "insertions": [
+            {
+              "line_number": 522,
+              "new_lines": [
+                "// Ensure the registry is cleared when empty",
+                "if (getRegistry() != null && getRegistry().isEmpty()) {",
+                "    REGISTRY.remove();",
+                "}"
+              ]
+            }
+          ],
+          "deletions": [],
+          "modifications": [
+            {
+              "line_number": 104,
+              "modified_line": "private static final ThreadLocal<Set<IDKey>> REGISTRY = ThreadLocal.withInitial(() -> null);"
+            },
+            {
+              "line_number": 106,
+              "modified_line": "protected Set<IDKey> initialValue() { return null; }"
+            },
+            {
+              "line_number": 152,
+              "modified_line": "Set<IDKey> registry = getRegistry(); return registry != null && registry.contains(new IDKey(value));"
+            },
+            {
+              "line_number": 538,
+              "modified_line": "Set<IDKey> registry = getRegistry(); if (registry != null) { registry.remove(new IDKey(value)); if (registry.isEmpty()) { REGISTRY.remove(); } }"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+``````json
+{
+  "thoughts": "I will address all the buggy lines by modifying the initial value of the ThreadLocal registry to return null, ensuring the registry is cleared when empty, and handling the FAULT_OF_OMISSION at line 522. This will involve modifying lines 104-109, 152, and 538, and inserting code at line 522.",
+  "command": {
+    "name": "write_fix",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "changes_dicts": [
+        {
+          "file_name": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+          "target_lines": [
+            ["104", "    private static final ThreadLocal<Set<IDKey>> REGISTRY = new ThreadLocal<Set<IDKey>>() {"],
+            ["105", "        @Override"],
+            ["106", "        protected Set<IDKey> initialValue() {"],
+            ["107", "            return new HashSet<IDKey>();"],
+            ["108", "        }"],
+            ["109", "    };"],
+            ["152", "        return getRegistry().contains(new IDKey(value));"],
+            ["538", "        getRegistry().remove(new IDKey(value));"],
+            ["522", "FAULT_OF_OMISSION"]
+          ],
+          "insertions": [
+            {
+              "line_number": 522,
+              "new_lines": [
+                "// Ensure the registry is cleared when empty",
+                "if (getRegistry() != null && getRegistry().isEmpty()) {",
+                "    REGISTRY.remove();",
+                "}"
+              ]
+            }
+          ],
+          "deletions": [],
+          "modifications": [
+            {
+              "line_number": 104,
+              "modified_line": "private static final ThreadLocal<Set<IDKey>> REGISTRY = ThreadLocal.withInitial(() -> null);"
+            },
+            {
+              "line_number": 105,
+              "modified_line": "// Removed unnecessary override"
+            },
+            {
+              "line_number": 106,
+              "modified_line": "// Removed initialValue method"
+            },
+            {
+              "line_number": 107,
+              "modified_line": "// Removed initialValue method"
+            },
+            {
+              "line_number": 108,
+              "modified_line": "// Removed initialValue method"
+            },
+            {
+              "line_number": 109,
+              "modified_line": "// Removed initialValue method"
+            },
+            {
+              "line_number": 152,
+              "modified_line": "Set<IDKey> registry = getRegistry(); return registry != null && registry.contains(new IDKey(value));"
+            },
+            {
+              "line_number": 538,
+              "modified_line": "Set<IDKey> registry = getRegistry(); if (registry != null) { registry.remove(new IDKey(value)); if (registry.isEmpty()) { REGISTRY.remove(); } }"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+``````json
+{
+  "thoughts": "The previous fix attempt led to a compilation error, likely due to the removal of the initialValue method and its override annotation. I will restore the initialValue method to return null and ensure the registry is cleared when empty. This should address the compilation issue while still attempting to fix the bug.",
+  "command": {
+    "name": "write_fix",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "changes_dicts": [
+        {
+          "file_name": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+          "insertions": [
+            {
+              "line_number": 522,
+              "new_lines": [
+                "// Ensure the registry is cleared when empty",
+                "if (getRegistry() != null && getRegistry().isEmpty()) {",
+                "    REGISTRY.remove();",
+                "}"
+              ]
+            }
+          ],
+          "deletions": [],
+          "modifications": [
+            {
+              "line_number": 104,
+              "modified_line": "private static final ThreadLocal<Set<IDKey>> REGISTRY = ThreadLocal.withInitial(() -> null);"
+            },
+            {
+              "line_number": 106,
+              "modified_line": "protected Set<IDKey> initialValue() { return null; }"
+            },
+            {
+              "line_number": 152,
+              "modified_line": "Set<IDKey> registry = getRegistry(); return registry != null && registry.contains(new IDKey(value));"
+            },
+            {
+              "line_number": 538,
+              "modified_line": "Set<IDKey> registry = getRegistry(); if (registry != null) { registry.remove(new IDKey(value)); if (registry.isEmpty()) { REGISTRY.remove(); } }"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+``````json
+{
+  "thoughts": "The previous fix did not address all the buggy lines. I will now attempt a different approach by ensuring that the REGISTRY is properly initialized and cleared when empty. I will also ensure that the initialValue method is correctly implemented to return a new HashSet, and modify the isRegistered and unregister methods to handle null values appropriately.",
+  "command": {
+    "name": "write_fix",
+    "args": {
+      "project_name": "lang",
+      "bug_index": 32,
+      "changes_dicts": [
+        {
+          "file_name": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+          "target_lines": [
+            ["104", "    private static final ThreadLocal<Set<IDKey>> REGISTRY = new ThreadLocal<Set<IDKey>>() {"],
+            ["105", "        @Override"],
+            ["106", "        protected Set<IDKey> initialValue() {"],
+            ["107", "            return new HashSet<IDKey>();"],
+            ["108", "        }"],
+            ["109", "    };"],
+            ["152", "        return getRegistry().contains(new IDKey(value));"],
+            ["538", "        getRegistry().remove(new IDKey(value));"],
+            ["522", "FAULT_OF_OMISSION"]
+          ],
+          "insertions": [
+            {
+              "line_number": 522,
+              "new_lines": [
+                "// Ensure the registry is cleared when empty",
+                "if (getRegistry() != null && getRegistry().isEmpty()) {",
+                "    REGISTRY.remove();",
+                "}"
+              ]
+            }
+          ],
+          "deletions": [],
+          "modifications": [
+            {
+              "line_number": 104,
+              "modified_line": "private static final ThreadLocal<Set<IDKey>> REGISTRY = ThreadLocal.withInitial(HashSet::new);"
+            },
+            {
+              "line_number": 152,
+              "modified_line": "Set<IDKey> registry = getRegistry(); return registry != null && registry.contains(new IDKey(value));"
+            },
+            {
+              "line_number": 538,
+              "modified_line": "Set<IDKey> registry = getRegistry(); if (registry != null) { registry.remove(new IDKey(value)); if (registry.isEmpty()) { REGISTRY.remove(); } }"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+``````json
+{
+  "thoughts": "Since the previous fix did not address all the buggy lines, I need to go back and collect more information to understand the bug better. This will help me identify the missing elements in the fix and ensure that all buggy lines are targeted.",
+  "command": {
+    "name": "go_back_to_collect_more_info",
+    "args": {
+      "reason_for_going_back": "The previous fix did not target all the buggy lines, indicating a need for a deeper understanding of the bug and its context."
+    }
+  }
+}
+``````json
+{
+  "thoughts": "I need to gather more information about the methods and classes in the file 'HashCodeBuilder.java' to understand the context of the bug better. This will help me identify any missing elements in the previous fixes and ensure that all buggy lines are targeted.",
+  "command": {
+    "name": "get_classes_and_methods",
+    "args": {
+      "project_name": "Lang",
+      "bug_index": 32,
+      "file_path": "org/apache/commons/lang3/builder/HashCodeBuilder.java"
+    }
+  }
+}
+``````json
+{
+  "thoughts": "The 'HashCodeBuilder' class contains several methods, including 'getRegistry', 'isRegistered', 'register', and 'unregister', which are directly related to the bug. The presence of multiple 'reflectionHashCode' and 'append' methods suggests that these might be overloaded or have different implementations. I should focus on understanding the 'reflectionHashCode' and 'append' methods, as they might interact with the registry and contribute to the bug. Extracting the code for these methods will provide insights into their implementation and help identify any issues related to the registry handling.",
+  "command": {
+    "name": "extract_method_code",
+    "args": {
+      "project_name": "Lang",
+      "bug_index": 32,
+      "filepath": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+      "method_name": "reflectionHashCode"
+    }
+  }
+}
+``````json
+{
+  "thoughts": "The 'reflectionHashCode' method has multiple overloaded implementations, with the core logic being in the implementation that takes the most parameters. This method uses 'reflectionAppend' to build the hash code, which might interact with the registry. To understand the interaction between 'reflectionHashCode' and the registry, I should extract the 'reflectionAppend' method code. This will help identify if there's any issue with how the registry is being used or updated during the hash code computation.",
+  "command": {
+    "name": "extract_method_code",
+    "args": {
+      "project_name": "Lang",
+      "bug_index": 32,
+      "filepath": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+      "method_name": "reflectionAppend"
+    }
+  }
+}
+``````json
+{
+  "thoughts": "The 'reflectionAppend' method registers the object at the beginning and unregisters it at the end. This ensures that the object is tracked in the registry while its fields are being processed. However, if the registry is not properly initialized or cleared, it could lead to unexpected behavior. The current implementation of 'initialValue' in the ThreadLocal returns a new HashSet, which might not be appropriate if the registry should be null initially. I will modify the 'initialValue' method to return null and ensure that the registry is properly checked for null before operations.",
+  "command": {
+    "name": "write_fix",
+    "args": {
+      "project_name": "Lang",
+      "bug_index": 32,
+      "changes_dicts": [
+        {
+          "file_name": "org/apache/commons/lang3/builder/HashCodeBuilder.java",
+          "insertions": [],
+          "deletions": [],
+          "modifications": [
+            {
+              "line_number": 106,
+              "modified_line": "protected Set<IDKey> initialValue() { return null; }"
+            },
+            {
+              "line_number": 152,
+              "modified_line": "Set<IDKey> registry = getRegistry(); return registry != null && registry.contains(new IDKey(value));"
+            },
+            {
+              "line_number": 538,
+              "modified_line": "Set<IDKey> registry = getRegistry(); if (registry != null) { registry.remove(new IDKey(value)); if (registry.isEmpty()) { REGISTRY.remove(); } }"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+```
